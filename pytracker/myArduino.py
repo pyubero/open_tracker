@@ -187,7 +187,10 @@ def a2r( A , rvd = 10_000, vd=+1, **kwargs):
     The voltage divider configuration is selected with Vd=+1 or Vd=-1'''
     rvd = float(rvd)
     vd  = float(vd)
-    return rvd*( 1/A -1 )**vd
+    if A==0:
+        return 1e-6
+    else:
+        return rvd*( 1/A -1 )**vd
 
 
 def r2t( R , rref=10_000, tref=25, beta=4050, **kwargs):
