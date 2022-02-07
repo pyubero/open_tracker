@@ -1,0 +1,423 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 10 14:26:05 2021
+
+@author: Pablo
+"""
+
+import cv2
+import numpy as np
+from datetime import datetime
+from time import sleep
+from threading import Thread
+from sys import platform
+from matplotlib import pyplot as plt
+
+
+class myCamera:
+    '''
+        This is to streamline the use of different cameras in the same scripts.
+        Common methods of a myCamera are:
+            open() and  close()
+            set()  and  get()
+            snapshot()
+            start_ and stop_streaming()
+            start_ and stop_preview()
+            start_ and stop_recording()
+        However, the list of properties that can be set/get are specific of each model. 
+        Then refer to the dictionnary properties to get the list of valid values.
+    '''
+    def __init__(self, camera_id = None, backend = cv2.CAP_DSHOW ):
+        
+        #...define initial variables
+        self.camera_id = camera_id
+        self.backend   = backend
+        self.vcapture  = cv2.VideoCapture() # cap object is created but it is not assigned to any camera or anything
+        
+        
+        self._verbose      = False
+        self._is_open      = False
+        self._frame        = []
+        
+        self.thread_recording_running = False
+        self.thread_streaming_running = False
+        self.preview_running          = False
+        
+        self.default_filename = 'video.avi'
+        self.default_format   = 'MJPG'
+        self.default_fps      = 5
+        self.default_totaltime= 9999 #about 2.7h
+        
+        self.properties = {}
+        self.__define_prop2cv()
+        
+        
+        # INITIALIZATION #
+        if camera_id is not None:
+            self.open( self.camera_id )
+            self.__update_properties()
+            
+        
+        
+    def __del__(self):
+        self.close()
+
+
+    def close(self):
+        self.stop_recording() if self.thread_recording_running else None
+        self.stop_preview()   if self.preview_running          else None
+        self.stop_streaming() if self.thread_streaming_running else None
+            
+        self.vcapture.release()
+        self._is_open = False
+        print('Camera is now closed') if self._verbose else None
+        
+        
+    def open(self, camera_id=None):
+        if self._is_open:
+            print('<< E >> Camera %d is already open.' % camera_id)
+            return 
+        
+        self.vcapture.open( camera_id , self.backend)
+        self._is_open = True
+        self.snapshot()
+        print('Camera is now open') if self._verbose else None
+        
+        
+    def snapshot(self, formfactor = 1):
+        if not self._is_open:
+            print("<< E >> Please open a camera before taking any snapshot.")
+            return None
+            
+        suc, self.frame = self.vcapture.read()
+        
+        if not suc:
+            print("<< E >> Camera is open, but VideoCapture object could not take any picture.")
+            return None       
+
+        if formfactor != 1:    
+            print('Snapshot taken and resized by %1.2f.' % formfactor ) if self._verbose else None
+            return cv2.resize( self.frame , None , fx=formfactor , fy=formfactor)
+        else:
+            print('Snapshot taken.') if self._verbose else None
+            return self.frame
+
+
+
+
+    #################################
+    ####### MODIFY PROPERTIES #######
+    def __define_prop2cv(self):
+        self.prop2cv = {}
+        self.prop2cv.update( {'width' : cv2.CAP_PROP_FRAME_WIDTH         } )
+        self.prop2cv.update( {'height' : cv2.CAP_PROP_FRAME_HEIGHT       } )
+        self.prop2cv.update( {'brightness' : cv2.CAP_PROP_BRIGHTNESS     } )
+        self.prop2cv.update( {'contrast' : cv2.CAP_PROP_CONTRAST         } )
+        self.prop2cv.update( {'exposure' : cv2.CAP_PROP_EXPOSURE         } )
+        self.prop2cv.update( {'saturation' : cv2.CAP_PROP_SATURATION     } )
+        self.prop2cv.update( {'autoexposure' :cv2.CAP_PROP_AUTO_EXPOSURE } )
+        self.prop2cv.update( {'hue' : cv2.CAP_PROP_HUE                   } )
+        self.prop2cv.update( {'gain' : cv2.CAP_PROP_GAIN                 } )
+
+        
+    def __update_properties(self):
+        for propName, cv2_code in self.prop2cv.items():
+            self.properties.update( { propName: self.vcapture.get(cv2_code   ) } )        
+        
+    def get(self, propertyName):
+        self.__update_properties()
+        return self.properties[propertyName]
+        
+        
+    def set(self, propertyName, value):
+        if propertyName == 'resolution':
+            
+            self.vcapture.set( cv2.CAP_PROP_FRAME_WIDTH,  value[0] )
+            self.vcapture.set( cv2.CAP_PROP_FRAME_HEIGHT, value[1] )    
+            self.__update_properties()
+            
+            if self.properties['width'] != value[0] or self.properties['height']!= value[1]:
+                print('Could net set the specified resolution. Using %dx%d instead.' %
+                      (self.properties['width'],self.properties['height'] ) )
+                return False
+        
+        else:
+            cv2_code = self.prop2cv[propertyName]
+            self.vcapture.set( cv2_code , value )
+            self.__update_properties()
+            
+            if self.properties[propertyName] != value:
+                print('Could not set the specified %s. Using %d instead.' % (propertyName, self.properties[propertyName]) )
+                return False
+        
+        
+        
+        
+
+    #################################
+    ######## STREAMING THREAD #######
+    def start_streaming(self):
+        
+        if not self._is_open:
+            print("<< E >> Please open a camera before starting the stream.")
+            return False
+        
+        if self.thread_streaming_running:
+            print("<< W >> A stream is already running.")
+            return True
+            
+        self.thread_streaming = Thread(target = self.__streaming_fun, daemon = True) 
+        self.thread_streaming.start()
+        sleep(0.5)
+        
+        return True
+
+
+    def stop_streaming(self):
+        if self.thread_streaming_running:
+            self.thread_streaming_running = False
+            self.thread_streaming.join()
+        else:
+            print('<< W >> Streaming not found, it could not be stopped.')
+        
+        return True
+
+
+    def __streaming_fun(self):
+        self.thread_streaming_running = True
+        print('Streaming started.') if self._verbose else None
+
+        self.streaming_myfps    = myFPS( averaging = 30 )
+        
+        while self.thread_streaming_running:
+            self.snapshot()
+            self.streaming_myfps.tick()
+        
+        self.thread_streaming_running = False
+        print('Streaming stopped.') if self._verbose else None
+
+
+    def streaming_fps(self):
+        return self.streaming_myfps.get()
+
+
+
+    #################################
+    ########## PREVIEW EASY #########
+    def start_preview(self, formfactor=1):
+        #... start stream if there is none
+        if self.start_streaming():
+            
+            self.preview_running = True
+            while self.preview_running:
+                frame    = self._resize( self.frame, formfactor)
+                fps_text = '%1.1f +/- %1.1f' % self.streaming_fps() 
+                color    = (0,0,255)
+                coords   = (20,20)
+                font     = cv2.FONT_HERSHEY_SIMPLEX
+                frame    = cv2.putText(frame, fps_text, coords, font, 0.5, color, 1, cv2.LINE_AA )
+                
+                if self.thread_recording_running:
+                    rec_text = '[REC %ds]' % self.recording_time
+                    cv2.putText(frame, rec_text, (20,40), font, 0.5, color, 1, cv2.LINE_AA )
+                
+                cv2.imshow('Preview. Press Q to exit.', frame  )
+                key = cv2.waitKey(1)
+                
+                if key==ord('q'):
+                    break
+                elif key == ord('r'):
+                    self.toggle_recording()
+                    
+
+            cv2.destroyAllWindows()
+            self.preview_running = False
+           
+            
+            
+    def stop_preview(self):
+        self.preview_running = False
+        sleep(0.5)
+            
+    
+    
+    #################################
+    ########## RECORDINGS ###########
+    def start_recording(self, filename=None, fmt=None, total_time=None, fps=None ):
+        if not self._is_open:
+            print("<< E >> Please open a camera before recording any video.")
+            return False
+        
+        if not self.start_streaming():
+            print("<< E >> Could not start a video stream.")
+            return False
+        
+        if self.thread_recording_running:
+            print('<< E >> A recording is already running, please stop it first.')
+            return False
+        
+        if filename is None:
+            filename = self.default_filename
+        if fmt is None:
+            fmt = self.default_format
+        if total_time is None:
+            total_time = self.default_totaltime
+        if fps is None:
+            fps = self.default_fps
+        
+        
+        THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
+        
+        self.thread_recording = Thread(target = THREADFUN, daemon = True) 
+        self.thread_recording.start()
+        sleep(0.5)
+        
+        
+    def stop_recording(self):
+        if self.thread_recording_running:
+            self.thread_recording_running = False
+            self.thread_recording.join()
+        else:
+            print('<< W >> Recording not found, it could not be stopped.')
+        return True
+        
+        
+    def __recording_fun(self, filename, fmt, total_time, fps ):
+        color      = int(0)
+        resolution = ( self.frame.shape[1], self.frame.shape[0] )
+        
+        fourcc     = cv2.VideoWriter_fourcc( *fmt )
+        speed      = 30
+        rec_start  = datetime.now()
+        
+        timer       = myTimer( 1.0/fps)
+        videoWriter = cv2.VideoWriter(filename, fourcc, speed,  resolution, color )
+        
+        self.recording_time    = 0
+        self.recording_nframes = 0
+        self.thread_recording_running = True
+        
+        #... then record every 1/FPS seconds
+        while self.recording_time < total_time and self.thread_recording_running:
+            self.recording_time = (datetime.now() - rec_start).total_seconds()
+            
+            if timer.isTime():
+                videoWriter.write(  cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)   )
+                self.recording_nframes += 1
+                
+        # signal that the recording has finished
+        self.thread_recording_running = False
+
+
+    def toggle_recording(self):
+        if self.thread_recording_running and self.thread_recording.is_alive():
+            self.stop_recording()
+        else:
+            self.start_recording()
+            
+        
+    
+    
+    #################################
+    ##### CONVENIENCE FUNCTIONS ##### 
+    def _resize(self, frame, formfactor):
+        return cv2.resize( frame, None , fx=formfactor, fy=formfactor )
+        
+
+
+
+
+
+class myFPS:
+    def __init__(self, averaging = 10):
+        self.lastTick=datetime(2,1,1,1,1)            #this would be tick number n
+        self.previousTick=datetime(1,1,1,1,1)       #this would be tick n-1
+        self.historic = np.ones((averaging,))
+        self._ii = 0
+        
+    def tick(self):
+        # Update ticks
+        self.previousTick=self.lastTick
+        self.lastTick=datetime.now()
+        
+        # Update FPS historic
+        self.historic[ self._ii ] = 1/( (self.lastTick-self.previousTick).total_seconds() + 1e-6)
+        self._ii += 1
+        if self._ii == len( self.historic ):
+            self._ii = 0
+        
+    def get(self):
+        return np.mean(self.historic), np.std(self.historic)
+
+
+
+class myTimer:
+    def __init__(self,DeltaTime):
+        self.DeltaTime=DeltaTime
+        self.previous=datetime.now()
+        
+    def isTime(self):
+        tFromPrevious=(datetime.now()-self.previous).total_seconds()
+        if tFromPrevious>self.DeltaTime:
+            self.previous = datetime.now()
+            return True
+        else :
+            return False   
+
+
+
+def number_of_cameras():
+    NumCams=0    
+    while True:
+        cap = cv2.VideoCapture(NumCams)
+        if cap.read()[0]:
+            NumCams=NumCams+1
+            cap.release()
+        else:
+            # cap.release()
+            break
+    if NumCams>0:
+        print('Total cameras found: '+str(NumCams)+'.')
+        return NumCams
+    else:
+        print('No cameras were found.')
+        return NumCams
+
+
+
+
+
+if __name__=='__main__':    
+    cam = myCamera(0)
+    cam.set('resolution', (1280,720) )
+    cam.set('brightness',16)
+    print('Brightness is %d' % cam.get('brightness') )
+    cam.start_preview( formfactor=0.5)
+    cam.close()
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

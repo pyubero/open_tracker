@@ -1,0 +1,498 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 10 14:26:05 2021
+
+@author: Pablo
+"""
+import cv2
+import numpy as np
+from vimba import *
+from datetime import datetime
+from time import sleep
+from threading import Thread
+from sys import platform
+from matplotlib import pyplot as plt
+from tqdm import tqdm
+
+class myCamera:
+    def __init__(self, camera_id = None, backend = cv2.CAP_DSHOW ):
+        
+        #...define initial variables
+        self.camera_id = camera_id
+        self.backend   = backend
+        self.vcapture  = cv2.VideoCapture() # cap object is created but it is not assigned to any camera 
+        
+        self._verbose      = True
+        self._is_open      = False
+        self._frame        = []
+
+
+        self.thread_streaming_running = False
+        self.thread_recording_running = False
+        self.preview_running          = False
+
+        self.default_filename = 'video_alvium.avi'
+        self.default_format   = 'MJPG'
+        self.default_fps      = 5
+        self.default_totaltime= 9999 #about 2.7h
+        
+        
+        # INITIALIZATION #
+        if camera_id is not None:
+            self.open( self.camera_id )
+            # self.__update_properties() #called from within open()
+            
+
+
+        
+    def __del__(self):
+        self.close()
+
+
+    def close(self):
+        if self.thread_streaming_running:
+            self.stop_streaming()
+        
+        if self.preview_running:
+            self.stop_preview()
+        
+        
+        
+    def open(self, camera_id = None):
+        if camera_id is None:
+            camera_id = self.camera_id
+        else:
+            self.camera_id = camera_id
+            
+        try:
+            if self.thread_streaming_running:
+                print('<< E >> Camera %d is already open.' % camera_id)
+                return 
+            
+            with Vimba.get_instance() as vimba:
+                cams = vimba.get_all_cameras()
+                with cams[self.camera_id] as cam:
+                    self.__update_properties(cam)
+                    
+            self._is_open = True
+            print('Alvium camera %d can now be opened.' % camera_id )
+            return True
+        
+        except:
+            self._is_open = False
+            print('<< E >> Failed to connect to Alvium camera %d.' % camera_id )
+            return False
+        
+        
+        
+    def snapshot(self, formfactor = 1):
+        # Slow way of taking pictures. It takes about 1s to open the camera and take a picture.
+        # If you need taking pictures faster, we recommend to start a stream, and grab
+        # pictures directly from self.frame.
+        
+        # A camera needs to be available
+        if not self._is_open:
+            print('<< E >> Please, open the camera before taking any snapshot.')
+            return
+        
+        # If a stream is already running, return current frame
+        if self.thread_streaming_running:
+            pass
+        #... if not, access the camera and update current frame
+        else:
+            with Vimba.get_instance() as vimba:
+                cams = vimba.get_all_cameras()
+                with cams[self.camera_id] as cam:
+                    self.__set_properties(cam)
+                    self.__update_properties(cam)
+                    frame_alvium = cam.get_frame()
+                    # frame_alvium.convert_pixel_format(PixelFormat.Mono8) # I think this is unnecessary
+                    
+                    self.frame = frame_alvium.as_opencv_image()
+                    
+        if formfactor != 1:    
+            print('Snapshot taken and resized by %1.2f.' % formfactor ) if self._verbose else None
+            return cv2.resize( self.frame , None , fx=formfactor , fy=formfactor)
+        else:
+            print('Snapshot taken.') if self._verbose else None
+            return self.frame
+
+
+    #################################
+    ####### MODIFY PROPERTIES #######
+    # To prevent the camera from raising errors from mismanipulations,
+    # we create a copy of the supposed properties of the camera as a dict.
+    # Whenever we use set() we JUST change the value in the dictionnary.
+    # Then whenever the camera is opened (snapshot and streaming), we try to upload
+    #...the values from the dict to the camera. 
+    # The true property values of the camera are downloaded whenever the camera 
+    #... is instantiated and after uploading our own values from the dict.
+    
+    def get(self, propertyName):
+        if propertyName in self.properties:
+            return self.properties[propertyName]
+        else:
+            print('<< W >> %s could not be found in myCamera.properties.' % propertyName )
+            return False
+
+    def set(self, propertyName, value):
+        if propertyName in self.properties:
+            self.properties.update( {propertyName : value})
+            print('Changed %s to %s' % (propertyName, str(value)) )
+        else:
+            print('<< W >> %s could not be found in myCamera.properties.' % propertyName )
+            return False
+
+
+    def __set_properties(self, cam):
+        ''' This function is called when opening the camera in snapshot() and streaming().
+        ExposureAuto is set to Once so that it adjust itselfs on initialization.
+            You can then regulate lighting with the manual aperture.
+        Gain is set to 0 to avoid any white-pixel noise. '''
+        # if self.thread_streaming_running:
+        #     print('<< E >> ')
+        cam.Width.set( self.properties['width'] )
+        cam.Height.set( self.properties['height'] )
+        cam.ExposureAuto.set( 'Once') #self.properties['autoexposure'] )
+        # cam.ExposureTime.set( self.properties['exposure'] )
+        # cam.GainAuto.set('Once')# self.properties['autogain'] )
+        cam.Gain.set( 0.0 ) #self1.properties['gain'] )
+        
+    def __update_properties(self, cam):
+        self.properties = {}
+        self.properties.update( {'width'    : cam.Width.get() } )
+        self.properties.update( {'height'   : cam.Height.get() } )
+        self.properties.update( {'autoexposure' : cam.ExposureAuto.get() } )
+        self.properties.update( {'exposure' : cam.ExposureTime.get() } )
+        self.properties.update( {'autogain' : cam.GainAuto.get() } )
+        self.properties.update( {'gain'     : cam.Gain.get()    })
+        self.properties.update( {'temperature': cam.DeviceTemperature.get() })
+        # self.properties.update( {'pxformat' : cam.PixelFormat.get() } )
+                
+      
+    #################################
+    ######## STREAMING THREAD #######
+    def start_streaming(self):
+        
+        if not self._is_open:
+            print("<< E >> Please open a camera before starting the stream.")
+            return False
+        
+        if self.thread_streaming_running and self.thread_streaming.is_alive():
+            print("<< W >> A stream is already running.")
+            return True
+            
+        self.thread_streaming = Thread(target = self.__streaming_fun, daemon = True) 
+        self.thread_streaming.start()
+        sleep(1.0)
+        
+        return True
+    
+    
+    def __streaming_fun(self):
+    
+        self.streaming_myfps    = myFPS( averaging = 30 )
+    
+        with Vimba.get_instance() as vimba:
+            cams = vimba.get_all_cameras()
+            
+            with cams[self.camera_id ] as cam:
+                self.__set_properties(cam)
+                self.__update_properties(cam)
+                cam.start_streaming( self.__streaming_frame_handler )
+                
+                self.thread_streaming_running = True
+                print('Streaming started.') if self._verbose else None
+                
+                while self.thread_streaming_running:
+                    sleep( 0.01 ) 
+                    
+                self.__update_properties(cam)
+                cam.stop_streaming()
+    
+    
+    
+    
+    def __streaming_frame_handler(self, cam, frame_alvium):
+        self.frame = frame_alvium.as_opencv_image()
+        self.streaming_myfps.tick()  
+        
+        #... check overheating
+        self.properties.update( {'temperature' : cam.DeviceTemperature.get() })
+        self.properties.update( {'exposure' : cam.ExposureTime.get() } )
+        if self.properties['temperature']>80:
+            print('')
+            print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            print('Temperature over limit.')
+            print('Aborting...')
+            self.close()
+        
+        # This is important to continue the stream
+        cam.queue_frame(frame_alvium)
+ 
+
+    
+    def stop_streaming(self):
+        if self.thread_streaming_running:
+            self.thread_streaming_running = False
+            self.thread_streaming.join()
+            print('Streaming stopped.') if self._verbose else None        
+
+        else:
+            print('<< W >> Streaming not found, it could not be stopped.')
+        
+        return True
+    
+      
+    def streaming_fps(self):
+        return self.streaming_myfps.get()
+    
+
+
+
+
+    #################################
+    ########## PREVIEW EASY #########
+    def start_preview(self, formfactor=1):
+        #... start stream if there is none
+        if self.start_streaming():
+            
+            self.preview_running = True
+            while self.preview_running:
+                frame    = self._resize( self.frame, formfactor)
+                frame    = cv2.cvtColor( frame, cv2.COLOR_GRAY2BGR )
+                fps_text = '%1.1f +/- %1.1f' % self.streaming_fps() 
+                temp_text= 'Temp = %2.1f' % self.properties['temperature']
+                color    = (0,0,255)
+                font     = cv2.FONT_HERSHEY_SIMPLEX
+                frame    = cv2.putText(frame, fps_text,  (20,20), font, 0.5, color, 1, cv2.LINE_AA )
+                frame    = cv2.putText(frame, temp_text, (20,40), font, 0.5, color, 1, cv2.LINE_AA )
+                
+                if self.thread_recording_running:
+                    rec_text = '[REC %ds]' % self.recording_time
+                    cv2.putText(frame, rec_text, (20,60), font, 0.5, color, 1, cv2.LINE_AA )
+                
+                cv2.imshow('Preview. Press Q to exit. Press R to start/stop recording.', frame  )
+                key = cv2.waitKey(10)
+                
+                if key==ord('q'):
+                    self.stop_preview()
+                    
+                elif key == ord('r'):
+                    self.toggle_recording()
+                    
+            cv2.destroyAllWindows()
+            self.preview_running = False
+           
+            
+            
+    def stop_preview(self):
+        self.preview_running = False
+        sleep(0.5)
+        
+    
+    
+    #################################
+    ########## RECORDINGS ###########
+    def start_recording(self, filename=None, fmt=None, total_time=None, fps=None ):
+        if not self._is_open:
+            print("<< E >> Please open a camera before recording any video.")
+            return False
+        
+        if not self.start_streaming():
+            print("<< E >> Could not start a video stream.")
+            return False
+        
+        if self.thread_recording_running:
+            print('<< E >> A recording is already running, please stop it first.')
+            return False
+         
+        if filename is None:
+            filename = self.default_filename
+            
+        if fmt is None:
+            fmt = self.default_format
+            
+        if total_time is None:
+            total_time = self.default_totaltime
+            
+        if fps is None:
+            fps = self.default_fps
+        
+        THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
+
+        self.thread_recording = Thread(target = THREADFUN, daemon = True) 
+        self.thread_recording.start()
+        sleep(0.5)
+        
+        
+    def stop_recording(self):
+        if self.thread_recording_running:
+            self.thread_recording_running = False
+            self.thread_recording.join()
+        else:
+            print('<< W >> Recording not found, it could not be stopped.')
+        return True
+        
+
+    def toggle_recording(self):
+        if self.thread_recording_running and self.thread_recording.is_alive():
+            self.stop_recording()
+        else:
+            self.start_recording()
+            
+            
+    def __recording_fun(self, filename, fmt, total_time, fps ):
+        color      = int(0)
+        resolution = ( self.frame.shape[1], self.frame.shape[0] )
+        
+        fourcc     = cv2.VideoWriter_fourcc( *fmt )
+        speed      = 30
+        rec_start  = datetime.now()
+        
+        timer       = myTimer( 1.0/fps)
+        videoWriter = cv2.VideoWriter(filename, fourcc, speed,  resolution, color )
+        
+        self.recording_time    = 0
+        self.recording_nframes = 0
+        self.thread_recording_running = True
+        
+        #... then record every 1/FPS seconds
+        while self.recording_time < total_time and self.thread_recording_running:
+            self.recording_time = (datetime.now() - rec_start).total_seconds()
+            
+            if timer.isTime():
+                videoWriter.write( self.frame )
+                self.recording_nframes += 1
+                
+        # signal that the recording has finished
+        self.thread_recording_running = False
+    
+    
+    #################################
+    ##### CONVENIENCE FUNCTIONS ##### 
+    def _resize(self, frame, formfactor):
+        return cv2.resize( frame, None , fx=formfactor, fy=formfactor )
+        
+
+
+
+
+
+class myFPS:
+    def __init__(self, averaging = 10):
+        self.lastTick=datetime(2,1,1,1,1)            #this would be tick number n
+        self.previousTick=datetime(1,1,1,1,1)       #this would be tick n-1
+        self.historic = np.ones((averaging,))
+        self._ii = 0
+        
+    def tick(self):
+        # Update ticks
+        self.previousTick=self.lastTick
+        self.lastTick=datetime.now()
+        
+        # Update FPS historic
+        self.historic[ self._ii ] = 1/( (self.lastTick-self.previousTick).total_seconds() + 1e-6)
+        self._ii += 1
+        if self._ii == len( self.historic ):
+            self._ii = 0
+        
+    def get(self):
+        return np.mean(self.historic), np.std(self.historic)
+
+
+
+class myTimer:
+    def __init__(self,DeltaTime):
+        self.DeltaTime=DeltaTime
+        self.previous=datetime.now()
+        
+    def isTime(self):
+        tFromPrevious=(datetime.now()-self.previous).total_seconds()
+        if tFromPrevious>self.DeltaTime:
+            self.previous = datetime.now()
+            return True
+        else :
+            return False   
+
+
+
+def number_of_cameras():
+    with Vimba.get_instance() as vimba:
+        cams = vimba.get_all_cameras()
+        NumCams = len(cams)
+        
+    if NumCams>0:
+        print('Total of Alvium cameras found: '+str(NumCams)+'.')
+        return NumCams
+    else:
+        print('No Alvium cameras were found.')
+        return NumCams
+
+
+
+
+
+if __name__=='__main__':
+    FILENAME = 'video_alvium.avi'
+    FORMAT   = 'MJPG'
+    LENGTH   = 10
+    FPS      = 10
+    
+    #... open camera
+    cam = myCamera(0)
+    cam.set('width', 2592)
+    cam.set('height', 1944)
+ 
+    #... take snapshot and plot it
+    # frame = cam.snapshot()
+    # plt.imshow(frame)
+    
+    #... starting streaming, or not, as you wish
+    # cam.start_streaming()   
+ 
+    #... start preview, before which you can start a recording or not
+    # cam.start_recording( FILENAME, FORMAT, LENGTH, FPS)
+    cam.start_preview( formfactor=0.33)
+
+    # cam.set('width',2592/4)
+    # sleep(1)
+    frame = cam.snapshot()
+    # print(frame.shape)
+    # print('------------')
+    # for key, value in cam.properties.items():
+    #     print(key,'\t', value)
+    # # cam.snapshot()
+
+    # for key, value in cam.properties.items():
+    #     print(key,'\t', value)
+    #... stop streaming, or not, close will stop it    
+    # cam.stop_streaming()
+    cam.close()
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
