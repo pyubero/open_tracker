@@ -1,0 +1,17 @@
+Step 1.
+Go to Allied Vision Download center to download the SDK.
+In our case we installed v5.1.0 for Windows from:
+	https://www.alliedvision.com/en/support/software-downloads/
+
+Install on: C:\Program Files\Allied Vision\Vimba_5.1
+and examples in : C:\Users\Public\Documents\Allied Vision\Vimba_5.1
+
+And BE SURE to install the Python Api, although we recommend a complete installation of the SDK.
+
+
+Step 2.
+Go the C:\Program Files\Allied Vision\Vimba_5.1\VimbaPython\Documentation
+and follow the manual's instructions for installing the python package.
+
+Basically they say to execute from a (conda) terminal in the sources folder the following command: python -m pip install .[numpy-export,opencv-export]
+

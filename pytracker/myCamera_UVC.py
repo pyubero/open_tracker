@@ -24,7 +24,7 @@ class myCamera:
             start_ and stop_streaming()
             start_ and stop_preview()
             start_ and stop_recording()
-        However, the list of properties that can be set/get are specific of each model. 
+        However, the list of properties that can be set/get are specific to each model. 
         Then refer to the dictionnary properties to get the list of valid values.
     '''
     def __init__(self, camera_id = None, backend = cv2.CAP_DSHOW ):
@@ -137,7 +137,7 @@ class myCamera:
             self.__update_properties()
             
             if self.properties['width'] != value[0] or self.properties['height']!= value[1]:
-                print('Could net set the specified resolution. Using %dx%d instead.' %
+                print('Could not set the specified resolution. Using %dx%d instead.' %
                       (self.properties['width'],self.properties['height'] ) )
                 return False
         
@@ -207,7 +207,10 @@ class myCamera:
     def start_preview(self, formfactor=1):
         #... start stream if there is none
         if self.start_streaming():
-            
+            print('Starting camera preview.')
+            print('Press R to start recording with default filename.')
+            print('Press Q to exit.')
+
             self.preview_running = True
             while self.preview_running:
                 frame    = self._resize( self.frame, formfactor)
@@ -258,10 +261,13 @@ class myCamera:
         
         if filename is None:
             filename = self.default_filename
+
         if fmt is None:
             fmt = self.default_format
+
         if total_time is None:
             total_time = self.default_totaltime
+
         if fps is None:
             fps = self.default_fps
         
@@ -382,19 +388,6 @@ def number_of_cameras():
     else:
         print('No cameras were found.')
         return NumCams
-
-
-
-
-
-if __name__=='__main__':    
-    cam = myCamera(0)
-    cam.set('resolution', (1280,720) )
-    cam.set('brightness',16)
-    print('Brightness is %d' % cam.get('brightness') )
-    cam.start_preview( formfactor=0.5)
-    cam.close()
-    
 
 
 

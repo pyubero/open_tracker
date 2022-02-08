@@ -124,9 +124,9 @@ class myCamera:
     # we create a copy of the supposed properties of the camera as a dict.
     # Whenever we use set() we JUST change the value in the dictionnary.
     # Then whenever the camera is opened (snapshot and streaming), we try to upload
-    #...the values from the dict to the camera. 
+    # ...the values from the dict to the camera. 
     # The true property values of the camera are downloaded whenever the camera 
-    #... is instantiated and after uploading our own values from the dict.
+    # ... is instantiated and after uploading our own values from the dict.
     
     def get(self, propertyName):
         if propertyName in self.properties:
