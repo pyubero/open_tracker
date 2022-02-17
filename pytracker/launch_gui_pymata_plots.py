@@ -145,6 +145,7 @@ class Ui(QtWidgets.QMainWindow):
         self.statusbar.showMessage('Found %d com ports.' % self.list_comports.count() )
         self.pb_reload_comports.setText('Reload')
 
+
     def connect(self):
         comport = self.list_comports.currentText()
         
