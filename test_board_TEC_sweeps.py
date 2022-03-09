@@ -16,7 +16,7 @@ DTEC     =  25
 TEC_MIN  =   0
 TEC_MAX  = 151
 EXPORT   = False
-FILENAME = 'tec_test.csv'
+FILENAME = 'data_test_tec.csv'
 
 
 
