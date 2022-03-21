@@ -43,10 +43,12 @@ class myCamera:
         self.thread_streaming_running = False
         self.preview_running          = False
         
-        self.default_filename = 'video.avi'
-        self.default_format   = 'MJPG'
-        self.default_fps      = 5
-        self.default_totaltime= 9999 #about 2.7h
+        self.recording_filename = 'video_NVIDEO.avi'
+        self.recording_format   = 'MJPG'
+        self.recording_fps      = 5
+        self.recording_totaltime= 99999 #about 2.7h
+        self.recording_maxtime  = 5
+        self.recording_nvideo   = -1
         
         self.properties = {}
         self.__define_prop2cv()
@@ -309,19 +311,13 @@ class myCamera:
             print('<< E >> A recording is already running, please stop it first.')
             return False
         
-        if filename is None:
-            filename = self.default_filename
-
-        if fmt is None:
-            fmt = self.default_format
-
-        if total_time is None:
-            total_time = self.default_totaltime
-
-        if fps is None:
-            fps = self.default_fps
+        if filename   is None: filename   = self.recording_filename
+        if fmt        is None: fmt        = self.recording_format
+        if total_time is None: total_time = self.recording_totaltime
+        if fps        is None: fps        = self.recording_fps
         
-        
+        self.recording_nvideo += 1
+        filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
         THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
         
         self.thread_recording = Thread(target = THREADFUN, daemon = True) 
@@ -345,6 +341,7 @@ class myCamera:
         fourcc     = cv2.VideoWriter_fourcc( *fmt )
         speed      = 30
         rec_start  = datetime.now()
+        autorestart= False
         
         timer       = myTimer( 1.0/fps)
         videoWriter = cv2.VideoWriter(filename, fourcc, speed,  resolution, color )
@@ -360,9 +357,17 @@ class myCamera:
             if timer.isTime():
                 videoWriter.write(  cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)   )
                 self.recording_nframes += 1
+            
+            if self.recording_time >= self.recording_maxtime:
+                self.thread_recording_running = False
+                autorestart = True
                 
         # signal that the recording has finished
         self.thread_recording_running = False
+        
+        if autorestart:
+            self.start_recording()
+
 
 
     def toggle_recording(self):
