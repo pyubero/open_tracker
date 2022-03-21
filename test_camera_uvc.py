@@ -19,6 +19,7 @@ cam = myCamera.myCamera(0)
 # Set some properties
 cam.set('resolution', (3000,3000) )
 cam.set('brightness',16)
+cam.set('saturation',0)
 
 # Retrieve some properties
 print('Resolution: %dx%d' % ( cam.get('width'), cam.get('height')) )
@@ -26,7 +27,7 @@ print('Brightness is %d' % cam.get('brightness') )
 
 # Take a picture
 cv2.imshow( 'window' , cam.snapshot(formfactor = 0.5) )
-cv2.waitKey(0)
+#cv2.waitKey(0)
 cv2.destroyAllWindows()
 
 # Start stream, and preview
