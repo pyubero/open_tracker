@@ -256,10 +256,22 @@ class myCamera:
     def start_preview(self, formfactor=1):
         #... start stream if there is none
         if self.start_streaming():
+            print('Starting camera preview.')
+            print('Press R to start recording with default filename.')
+            print('Press Z to zoom in a rectangle.')
+            print('Press Q to exit.')
+            
             
             self.preview_running = True
+            self.preview_zoom_bbox = None
+            self.preview_ffactor_main = formfactor
+            self.preview_ffactor_zoom = 1
+            self.preview_winname_main = 'Preview. Press Q to exit.'
+            self.preview_winname_zoom = 'Zoom region. Press Z to delete.'
+            
+            
             while self.preview_running:
-                frame    = self._resize( self.frame, formfactor)
+                frame    = self._resize( self.frame, self.preview_ffactor_main)
                 frame    = cv2.cvtColor( frame, cv2.COLOR_GRAY2BGR )
                 fps_text = '%1.1f +/- %1.1f' % self.streaming_fps() 
                 temp_text= 'Temp = %2.1f' % self.properties['temperature']
@@ -268,11 +280,31 @@ class myCamera:
                 frame    = cv2.putText(frame, fps_text,  (20,20), font, 0.5, color, 1, cv2.LINE_AA )
                 frame    = cv2.putText(frame, temp_text, (20,40), font, 0.5, color, 1, cv2.LINE_AA )
                 
+                # Draw some text with information on the main frame
                 if self.thread_recording_running:
                     rec_text = '[REC %ds]' % self.recording_time
                     cv2.putText(frame, rec_text, (20,60), font, 0.5, color, 1, cv2.LINE_AA )
                 
-                cv2.imshow('Preview. Press Q to exit. Press R to start/stop recording.', frame  )
+                # Create zoom window
+                if self.preview_zoom_bbox:
+                    x0,y0,w,h = self.preview_zoom_bbox
+                    ff        = self.preview_ffactor_main
+                    
+                    #... crop original frame and display
+                    zoom_frame = self.frame[int(y0):int(y0+h), int(x0):int(x0+w)]
+                    zoom_frame = self._resize( zoom_frame, self.preview_ffactor_zoom)
+
+                    cv2.imshow( self.preview_winname_zoom , zoom_frame )
+                    cv2.setMouseCallback(self.preview_winname_zoom, lambda event,x,y,flags,params : self.__preview_callback(event,x,y,flags,'zoom') )
+                    
+                    #... draw on the main frame the zoomed rectangle
+                    frame = cv2.rectangle( frame, ( int(x0*ff) ,int(y0*ff) ), ( int(x0*ff+w*ff), int(y0*ff+h*ff) ), (255,0,0), 1 )
+                    
+
+                cv2.imshow(self.preview_winname_main, frame  )
+                cv2.setMouseCallback(self.preview_winname_main, lambda event,x,y,flags,params : self.__preview_callback(event,x,y,flags,'main') )
+                
+           
                 key = cv2.waitKey(10)
                 
                 if key==ord('q'):
@@ -281,11 +313,37 @@ class myCamera:
                 elif key == ord('r'):
                     self.toggle_recording()
                     
+                elif key == ord('z'):
+                    if self.preview_zoom_bbox:
+                        self.preview_zoom_bbox=None
+                        cv2.destroyAllWindows()
+                    else:
+                        cv2.destroyAllWindows()
+                        self.preview_zoom_bbox = cv2.selectROI(frame, showCrosshair=False)
+                        self.preview_zoom_bbox = [ value/self.preview_ffactor_main for value in self.preview_zoom_bbox]
+                        cv2.destroyAllWindows()  
+                    
             cv2.destroyAllWindows()
             self.preview_running = False
            
             
-            
+     
+    def __preview_callback(self, event,x,y,flags,param):
+        # Event on Left button double click
+        if event == cv2.EVENT_LBUTTONDBLCLK:
+            if param =='main':
+                self.preview_ffactor_main = 1.2*self.preview_ffactor_main
+            if param =='zoom':
+                self.preview_ffactor_zoom = 1.2*self.preview_ffactor_zoom
+        
+        # Event on Right button double click
+        if event == cv2.EVENT_RBUTTONDBLCLK:
+            if param =='main':
+                self.preview_ffactor_main = 0.833*self.preview_ffactor_main
+            if param =='zoom':
+                self.preview_ffactor_zoom = 0.833*self.preview_ffactor_zoom
+           
+                
     def stop_preview(self):
         self.preview_running = False
         sleep(0.5)

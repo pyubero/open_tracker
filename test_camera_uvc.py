@@ -32,7 +32,7 @@ cv2.destroyAllWindows()
 
 # Start stream, and preview
 #... and start recording by pressing R
-cam.start_preview( formfactor=0.5)
+cam.start_preview( formfactor=1.0)
 
 # Close camera
 cam.close()

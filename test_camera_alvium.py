@@ -32,7 +32,7 @@ print('Resolution: %dx%d' % ( cam.get('width'), cam.get('height')) )
 
 # Take a picture
 frame = cam.snapshot()
-plt.imshow(frame)
+#plt.imshow(frame)
 
 # Starting streaming (or not, as you wish)
 cam.start_streaming()   
