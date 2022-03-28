@@ -316,7 +316,10 @@ class myCamera:
         if total_time is None: total_time = self.recording_totaltime
         if fps        is None: fps        = self.recording_fps
         
-        self.recording_nvideo += 1
+        self.recording_time    = 0
+        self.recording_nframes = 0
+        self.recording_start   = datetime.now()
+
         filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
         THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
         
@@ -340,25 +343,26 @@ class myCamera:
         
         fourcc     = cv2.VideoWriter_fourcc( *fmt )
         speed      = 30
-        rec_start  = datetime.now()
         autorestart= False
+        started_chunk = datetime.now()
+        
         
         timer       = myTimer( 1.0/fps)
         videoWriter = cv2.VideoWriter(filename, fourcc, speed,  resolution, color )
         
-        self.recording_time    = 0
-        self.recording_nframes = 0
+        self.recording_nvideo += 1
         self.thread_recording_running = True
         
         #... then record every 1/FPS seconds
-        while self.recording_time < total_time and self.thread_recording_running:
-            self.recording_time = (datetime.now() - rec_start).total_seconds()
-            
+        while self.recording_time <= total_time and self.thread_recording_running:           
+            self.recording_time = (datetime.now() - self.recording_start).total_seconds()
+            recording_chunk     = (datetime.now() - started_chunk ).total_seconds()
+             
             if timer.isTime():
                 videoWriter.write(  cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)   )
                 self.recording_nframes += 1
-            
-            if self.recording_time >= self.recording_maxtime:
+                 
+            if recording_chunk >= self.recording_maxtime:
                 self.thread_recording_running = False
                 autorestart = True
                 
@@ -366,8 +370,21 @@ class myCamera:
         self.thread_recording_running = False
         
         if autorestart:
-            self.start_recording()
+            self.__restart_recording()
 
+
+    def __restart_recording(self):
+        filename = self.recording_filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
+        fmt        = self.recording_format
+        total_time = self.recording_totaltime
+        fps        = self.recording_fps
+       
+        THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
+
+        self.thread_recording = Thread(target = THREADFUN, daemon = True) 
+        self.thread_recording.start()
+        sleep(0.5)
+        
 
 
     def toggle_recording(self):
