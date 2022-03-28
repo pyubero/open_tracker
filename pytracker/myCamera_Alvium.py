@@ -31,10 +31,12 @@ class myCamera:
         self.thread_recording_running = False
         self.preview_running          = False
 
-        self.default_filename = 'video_alvium.avi'
-        self.default_format   = 'MJPG'
-        self.default_fps      = 5
-        self.default_totaltime= 9999 #about 2.7h
+        self.recording_filename = 'video_NVIDEO.avi'
+        self.recording_format   = 'MJPG'
+        self.recording_fps      = 1
+        self.recording_totaltime= 99999 #about 2.7h
+        self.recording_maxtime  = 5
+        self.recording_nvideo   = 0
         
         
         # INITIALIZATION #
@@ -365,24 +367,23 @@ class myCamera:
             print('<< E >> A recording is already running, please stop it first.')
             return False
          
-        if filename is None:
-            filename = self.default_filename
-            
-        if fmt is None:
-            fmt = self.default_format
-            
-        if total_time is None:
-            total_time = self.default_totaltime
-            
-        if fps is None:
-            fps = self.default_fps
+        if filename   is None: filename   = self.recording_filename
+        if fmt        is None: fmt        = self.recording_format
+        if total_time is None: total_time = self.recording_totaltime
+        if fps        is None: fps        = self.recording_fps
         
+        self.recording_time    = 0
+        self.recording_nframes = 0
+        self.recording_start   = datetime.now()
+
+        filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
+       
         THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
 
         self.thread_recording = Thread(target = THREADFUN, daemon = True) 
         self.thread_recording.start()
         sleep(0.5)
-        
+                
         
     def stop_recording(self):
         if self.thread_recording_running:
@@ -406,27 +407,52 @@ class myCamera:
         
         fourcc     = cv2.VideoWriter_fourcc( *fmt )
         speed      = 30
-        rec_start  = datetime.now()
+        autorestart= False
+        started_chunk = datetime.now()
+        
         
         timer       = myTimer( 1.0/fps)
         videoWriter = cv2.VideoWriter(filename, fourcc, speed,  resolution, color )
         
-        self.recording_time    = 0
-        self.recording_nframes = 0
+        self.recording_nvideo += 1
         self.thread_recording_running = True
         
+        
         #... then record every 1/FPS seconds
-        while self.recording_time < total_time and self.thread_recording_running:
-            self.recording_time = (datetime.now() - rec_start).total_seconds()
+        while self.recording_time <= total_time and self.thread_recording_running:           
+            self.recording_time = (datetime.now() - self.recording_start).total_seconds()
+            recording_chunk     = (datetime.now() - started_chunk ).total_seconds()
             
             if timer.isTime():
                 videoWriter.write( self.frame )
                 self.recording_nframes += 1
                 
+            if recording_chunk >= self.recording_maxtime:
+                self.thread_recording_running = False
+                autorestart = True
+                
+                
         # signal that the recording has finished
         self.thread_recording_running = False
     
+        if autorestart:
+            self.__restart_recording()
     
+    
+    
+    def __restart_recording(self):
+        filename = self.recording_filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
+        fmt        = self.recording_format
+        total_time = self.recording_totaltime
+        fps        = self.recording_fps
+       
+        THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
+
+        self.thread_recording = Thread(target = THREADFUN, daemon = True) 
+        self.thread_recording.start()
+        sleep(0.5)
+        
+        
     #################################
     ##### CONVENIENCE FUNCTIONS ##### 
     def _resize(self, frame, formfactor):
@@ -491,42 +517,42 @@ def number_of_cameras():
 
 
 
-if __name__=='__main__':
-    FILENAME = 'video_alvium.avi'
-    FORMAT   = 'MJPG'
-    LENGTH   = 10
-    FPS      = 10
+# if __name__=='__main__':
+#     FILENAME = 'video_alvium.avi'
+#     FORMAT   = 'MJPG'
+#     LENGTH   = 10
+#     FPS      = 10
     
-    #... open camera
-    cam = myCamera(0)
-    cam.set('width', 2592)
-    cam.set('height', 1944)
+#     #... open camera
+#     cam = myCamera(0)
+#     cam.set('width', 2592)
+#     cam.set('height', 1944)
  
-    #... take snapshot and plot it
-    # frame = cam.snapshot()
-    # plt.imshow(frame)
+#     #... take snapshot and plot it
+#     # frame = cam.snapshot()
+#     # plt.imshow(frame)
     
-    #... starting streaming, or not, as you wish
-    # cam.start_streaming()   
+#     #... starting streaming, or not, as you wish
+#     # cam.start_streaming()   
  
-    #... start preview, before which you can start a recording or not
-    # cam.start_recording( FILENAME, FORMAT, LENGTH, FPS)
-    cam.start_preview( formfactor=0.33)
+#     #... start preview, before which you can start a recording or not
+#     # cam.start_recording( FILENAME, FORMAT, LENGTH, FPS)
+#     cam.start_preview( formfactor=0.33)
 
-    # cam.set('width',2592/4)
-    # sleep(1)
-    frame = cam.snapshot()
-    # print(frame.shape)
-    # print('------------')
-    # for key, value in cam.properties.items():
-    #     print(key,'\t', value)
-    # # cam.snapshot()
+#     # cam.set('width',2592/4)
+#     # sleep(1)
+#     frame = cam.snapshot()
+#     # print(frame.shape)
+#     # print('------------')
+#     # for key, value in cam.properties.items():
+#     #     print(key,'\t', value)
+#     # # cam.snapshot()
 
-    # for key, value in cam.properties.items():
-    #     print(key,'\t', value)
-    #... stop streaming, or not, close will stop it    
-    # cam.stop_streaming()
-    cam.close()
+#     # for key, value in cam.properties.items():
+#     #     print(key,'\t', value)
+#     #... stop streaming, or not, close will stop it    
+#     # cam.stop_streaming()
+#     cam.close()
     
 
 
