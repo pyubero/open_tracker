@@ -28,6 +28,11 @@ class myArduino:
         self._blinking_running = [False    for _ in range(self.total_digital_pins) ]
         self.blink_threads     = [Thread() for _ in range(self.total_digital_pins) ]
         
+
+        self.STATUS_LED_PIN = 13
+
+
+
     def __del__(self):
         self.close()
          
@@ -53,6 +58,30 @@ class myArduino:
             self.board.set_pin_mode_servo(pin_number)
 
 
+    def close(self):
+        #Disable all analog and digital reportings
+        for pin in range( self.total_analog_pins):
+            self.board.disable_analog_reporting(pin)
+            sleep(0.1)
+        
+        for pin in range( self.total_digital_pins):
+            self.board.disable_digital_reporting(pin)
+            sleep(0.1)
+        
+        
+        # Turn off all digital pins
+        for pin in range(self.total_digital_pins):
+            self.write(pin, 0)
+            sleep(0.1)
+        
+        
+        self.board.shutdown()
+        print('Arduino communication closed.') 
+
+
+    #=====================================#
+    #    BASIC COMMUNICATING FUNCTIONS    #
+    #=====================================#
     def read(self, pin_number, mode='analog',**kwargs):
         '''Here kwargs can be Rvd, Vd, Rref, Tref, Iref'''
         
@@ -85,28 +114,7 @@ class myArduino:
             return self.board.pwm_write( pin_number, value)
         
         elif mode=='servo':
-            return self.board.servo_write(pin_number, value)
-    
-    
-    def close(self):
-        #Disable all analog and digital reportings
-        for pin in range( self.total_analog_pins):
-            self.board.disable_analog_reporting(pin)
-            sleep(0.1)
-        
-        for pin in range( self.total_digital_pins):
-            self.board.disable_digital_reporting(pin)
-            sleep(0.1)
-        
-        
-        # Turn off all digital pins
-        for pin in range(self.total_digital_pins):
-            self.write(pin, 0)
-            sleep(0.1)
-        
-        
-        self.board.shutdown()
-        print('Arduino communication closed.')    
+            return self.board.servo_write(pin_number, value)   
 
         
     def write_pwm(self, pin_number, value):
@@ -138,38 +146,32 @@ class myArduino:
             return
         
         
-    # def blink_start(self, pin_number, frequency):
-    #     if self._blinking_running[pin_number]:
-    #         self._blink_stop(pin_number)
+    #===============================#
+    #    BLINKING LEDS FUNCTIONS    #
+    #===============================#
+    def __setup_blinking_leds(self):
+        self.thread_led_status = Thread()
+        self.thread_led_status_running = False
         
-    #     self.blink_threads[pin_number] = Thread( target= lambda: self._blink_threadfun(pin_number, frequency), daemon = True)
-    #     self.blink_threads[pin_number].start()
         
+    def __blink_threadfun_status(self):
+        self.thread_led_status_running = True
+        DTIME          = 0.3        
+        tLast          = datetime.now()
         
-        
-    # def _blink_stop(self, pin_number):
-    #     if self._blinking_running[pin_number]:
-    #         self._blinking_running[pin_number] = False
-    #         self.blink_threads[pin_number].join()
-    #         self.write(pin_number, 0)
-
-        
-    # def _blink_threadfun(self, pin_number , frequency = 1.0 ):         
-    #     self._blinking_running[pin_number] = True
-        
-    #     dtime = 1.0/frequency 
-    #     print('Blinking thread started.')
-        
-    #     tLast = datetime.now()
-    #     while self._blinking_running[pin_number]:    
-            
-    #         if (datetime.now()-tLast).total_seconds() > dtime:
-    #             self.toggle(pin_number)
-    #             tLast = datetime.now()
-    #             sleep(0.01)
-
-        
-    #     print('Blinking thread stopped.')
+        while self.thread_led_status_running:    
+            if (datetime.now()-tLast).total_seconds() > DTIME:
+                self.toggle(self.STATUS_LED_PIN)
+                tLast = datetime.now()
+                sleep(0.02)
+                
+    def start_blink_status(self):
+        if self.thread_led_status_running:
+            print('<W> Status led is already blinking.')
+            return
+        else:
+            self.thread_led_status = Thread(target= self.__blink_threadfun_status , daemon = True)
+            self.thread_led_status.start()
 
 
 
@@ -208,13 +210,6 @@ def r2i( R, rref=10_000, iref= 1000, gamma = 0.65, **kwargs):
     gamma= float(gamma)
     
     return iref*(R/rref)**(-gamma)
-    
-
-# def program_function(delay, function ):
-#     start_time = threading.Timer( interval=delay, function=function )
-
-    
-    
     
 
     
