@@ -43,8 +43,8 @@ cam.set('height', 1944)
 cam.recording_filename = 'video_NVIDEO.avi' #... NVIDEO will be substituted by video index
 cam.recording_format   = 'MJPG'
 cam.recording_fps      = 1
-cam.recording_totaltime= 10  #... in seconds
-cam.recording_maxtime  = 3   #... in seconds
+cam.recording_totaltime= 3600  #... in seconds
+cam.recording_maxtime  = 2000  #... in seconds
 
 
 
