@@ -21,6 +21,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 
+BAUDRATE = 28800
 
 def find_devices():
     return [comport.device for comport in serial.tools.list_ports.comports()]
@@ -157,7 +158,7 @@ class Ui(QtWidgets.QMainWindow):
             
             try:
                 # open board
-                self.board = pymata4.Pymata4( com_port = comport, baud_rate=57600 )
+                self.board = pymata4.Pymata4( com_port = comport, baud_rate=BAUDRATE )
                 
                 # define all digital pins as outputs
                 _ = [ self.board.set_pin_mode_digital_output(jj) for jj in (2,4,7,8,12,13) ]

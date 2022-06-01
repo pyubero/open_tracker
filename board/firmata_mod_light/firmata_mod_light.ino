@@ -1,7 +1,7 @@
 /*
  This is a modified FIRMATA protocol. The only modification being
  the change of clock registers to allow faster PWM frequencies.
- All changes reside in the ## SETUP ## section.
+ All changes reside in the ## SETUP ## section, around l.600.
  
  Cheers,
  Pablo Yubero 2021
@@ -598,9 +598,9 @@ void setup()
   // PWM FREQUENCIES
   // Modifying digital pins D3 and D11
   // TCCR2B = TCCR2B & B11111000 | B00000001; // for PWM frequency of 31372.55 Hz
-  TCCR2B = TCCR2B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
+  // TCCR2B = TCCR2B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
   // TCCR2B = TCCR2B & B11111000 | B00000011; // for PWM frequency of 980.39 Hz
-  // TCCR2B = TCCR2B & B11111000 | B00000100; // for PWM frequency of 490.20 Hz (The DEFAULT)
+  TCCR2B = TCCR2B & B11111000 | B00000100; // for PWM frequency of 490.20 Hz (The DEFAULT)
   // TCCR2B = TCCR2B & B11111000 | B00000101; // for PWM frequency of 245.10 Hz
   // TCCR2B = TCCR2B & B11111000 | B00000110; // for PWM frequency of 122.55 Hz
   // TCCR2B = TCCR2B & B11111000 | B00000111; // for PWM frequency of 30.64 Hz
@@ -608,14 +608,14 @@ void setup()
   // Modifying digital pins D5 and D6
   // TCCR0B = TCCR0B & B11111000 | B00000001; // for PWM frequency of 62500.00 Hz
   // TCCR0B = TCCR0B & B11111000 | B00000010; // for PWM frequency of 7812.50 Hz
-  // TCCR0B = TCCR0B & B11111000 | B00000011; // for PWM frequency of 976.56 Hz (The DEFAULT)
+  TCCR0B = TCCR0B & B11111000 | B00000011; // for PWM frequency of 976.56 Hz (The DEFAULT)
   // TCCR0B = TCCR0B & B11111000 | B00000100; // for PWM frequency of 244.14 Hz
   // TCCR0B = TCCR0B & B11111000 | B00000101; // for PWM frequency of 61.04 Hz
   
   // Modifying digital pins D9 and D10
-  // TCCR1B = TCCR1B & B11111000 | B00000001; // set timer 1 divisor to 1 for PWM frequency of 31372.55 Hz
-  TCCR1B = TCCR1B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
-  // TCCR1B = TCCR1B & B11111000 | B00000011; // for PWM frequency of 490.20 Hz (The DEFAULT)
+  //TCCR1B = TCCR1B & B11111000 | B00000001; // set timer 1 divisor to 1 for PWM frequency of 31372.55 Hz
+  // TCCR1B = TCCR1B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
+  TCCR1B = TCCR1B & B11111000 | B00000011; // for PWM frequency of 490.20 Hz (The DEFAULT)
   // TCCR1B = TCCR1B & B11111000 | B00000100; // for PWM frequency of 122.55 Hz
   // TCCR1B = TCCR1B & B11111000 | B00000101; // for PWM frequency of 30.64 Hz
   

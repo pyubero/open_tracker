@@ -14,22 +14,22 @@ from pytracker import myCamera_Alvium as myCamera
 
 
 
-# # Find devices connected to computer
-# devices = myArduTracker.find_devices()
-# print('These are the devices found:')
-# _ = [ print('-- %s' % dev) for dev in devices ]
-# print('')
+# Find devices connected to computer
+devices = myArduTracker.find_devices()
+print('These are the devices found:')
+_ = [ print('-- %s' % dev) for dev in devices ]
+print('')
 
-# # Connect to last device
-# # ... status led should blink in orange
-# print('Connecting to last device...', end='')
-# board = myArduTracker.myArduTracker( devices[-1] )
-# print(' done.')
+# Connect to last device
+# ... status led should blink in orange
+print('Connecting to last device...', end='')
+board = myArduTracker.myArduTracker( devices[-1] )
+print(' done.')
 
-# # Connect potentiometer, 
-# print('Linking potentiometer to led1...', end='')
-# board.start_pot_link()
-# print(' done.')
+# Connect potentiometer, 
+print('Linking potentiometer...', end='')
+board.start_pot_link('led2')
+print(' done.')
 
 
 
@@ -60,7 +60,7 @@ cam.start_preview( formfactor=0.33)
 
 # Close camera
 cam.close()
-
+board.close()
 
 
 

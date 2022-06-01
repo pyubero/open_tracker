@@ -17,7 +17,7 @@ from datetime import datetime
 class myArduTracker:
     def __init__(self, device):
         print('Initializing arduino...')
-        self.board = pymata4.Pymata4(com_port = device, baud_rate = 57600)
+        self.board = pymata4.Pymata4(com_port = device, baud_rate = 28800)
         
         self.total_analog_pins = len(self.board.analog_pins)
         self.total_digital_pins = len(self.board.digital_pins) - self.total_analog_pins
@@ -337,26 +337,28 @@ class myArduTracker:
         self.thread_pot_link = Thread()
         self.thread_pot_link_running = False
     
-    def start_pot_link(self):
+    def start_pot_link(self, output='led1'):
         if self.thread_pot_link_running:
             print('<W> A previous pot_link thread is running.')
             print('   Please stop it before starting another.')
             return
         else:
-            self.thread_pot_link = Thread(target= self.__threadfun_potlink , daemon = True)
+            self.thread_pot_link = Thread(target= self.__threadfun_potlink , args=(output,) , daemon = True)
             self.thread_pot_link.start()
     
     
-    def __threadfun_potlink(self):
+    def __threadfun_potlink(self, output):
         self.thread_pot_link_running = True
             
         DTIME          = 0.1        
-        
+        NVALS          = 50
         tLast          = datetime.now()
-        
+        print('Correctly connected pot to %s' % output)
         while self.thread_pot_link_running:    
             if (datetime.now()-tLast).total_seconds() > DTIME:
-                self.led1( int(self.pot()*255) )
+                value = np.round( self.pot()*NVALS )/NVALS*255
+                self.write( self.pinout[output], int(value), mode='pwm')
+                
                 tLast = datetime.now()
                 sleep(0.02)
     
