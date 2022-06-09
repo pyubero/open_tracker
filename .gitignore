@@ -1,7 +1,13 @@
 
-*.pyc
-*.pyc
-*.pyc
-pytracker/__pycache__/myArduTracker.cpython-39.pyc
+**.pyc
 *.avi
 *.pyc
+*.mp4
+*.png
+*.mkv
+**/*.cpython-39.pyc
+**/*.cpython-39
+**FCStd1
+*.FCStd1
+pytracker/__pycache__/
+

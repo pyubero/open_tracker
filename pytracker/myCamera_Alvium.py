@@ -5,6 +5,7 @@ Created on Wed Nov 10 14:26:05 2021
 @author: Pablo
 """
 import cv2
+import numbers
 import numpy as np
 from vimba import *
 from datetime import datetime
@@ -25,7 +26,7 @@ class myCamera:
         self._verbose      = True
         self._is_open      = False
         self._frame        = []
-
+        self._exposure_auto = False
 
         self.thread_streaming_running = False
         self.thread_recording_running = False
@@ -52,12 +53,15 @@ class myCamera:
 
 
     def close(self):
-        if self.thread_streaming_running:
-            self.stop_streaming()
-        
+        if self.thread_recording_running:
+            self.stop_recording()
+            
         if self.preview_running:
             self.stop_preview()
-        
+            
+        if self.thread_streaming_running:
+            self.stop_streaming()
+                
         
         
     def open(self, camera_id = None):
@@ -155,10 +159,17 @@ class myCamera:
         #     print('<< E >> ')
         cam.Width.set( self.properties['width'] )
         cam.Height.set( self.properties['height'] )
-        cam.ExposureAuto.set( 'Once') #self.properties['autoexposure'] )
-        # cam.ExposureTime.set( self.properties['exposure'] )
+        cam.Gain.set( 0.0 ) 
+        
+        # check exposure time
+        val = cam.ExposureTime.get()
+        inc = cam.ExposureTime.get_increment()
+        delta = int( ( self.properties['exposure'] - val )/inc )
+        cam.ExposureTime.set( val + delta*inc )
+        
+        #............
+        #cam.ExposureTime.set( self.properties['exposure'] )
         # cam.GainAuto.set('Once')# self.properties['autogain'] )
-        cam.Gain.set( 0.0 ) #self1.properties['gain'] )
         
     def __update_properties(self, cam):
         self.properties = {}
@@ -169,9 +180,25 @@ class myCamera:
         self.properties.update( {'autogain' : cam.GainAuto.get() } )
         self.properties.update( {'gain'     : cam.Gain.get()    })
         self.properties.update( {'temperature': cam.DeviceTemperature.get() })
-        # self.properties.update( {'pxformat' : cam.PixelFormat.get() } )
+        #self.properties.update( {'pxformat' : cam.PixelFormat.get() } )
                 
-      
+    
+    def __auto_exposure_fun(self, cam):
+        print('Computing exposure time')
+        cam.ExposureAuto.set('Once')
+        value = cam.ExposureTime.get()
+        self._exposure_auto = False
+    
+    def set_auto_exposure(self):
+        self._exposure_auto = True
+        
+        
+    def summary(self):
+        print('----- Summary -----')
+        for key, value in self.properties.items():
+            if isinstance( value, numbers.Number) :
+                print("%12s - %1.1f" % (key, value) )
+        
     #################################
     ######## STREAMING THREAD #######
     def start_streaming(self):
@@ -207,6 +234,11 @@ class myCamera:
                 print('Streaming started.') if self._verbose else None
                 
                 while self.thread_streaming_running:
+                    # Check whether to recalculate exposure time automatically...
+                    if self._exposure_auto:
+                        self.__auto_exposure_fun(cam)
+                    
+                    # Sleep some time so the max fps are 100
                     sleep( 0.01 ) 
                     
                 self.__update_properties(cam)
@@ -307,13 +339,16 @@ class myCamera:
                 cv2.setMouseCallback(self.preview_winname_main, lambda event,x,y,flags,params : self.__preview_callback(event,x,y,flags,'main') )
                 
            
-                key = cv2.waitKey(10)
+                key = cv2.waitKey(5)
                 
                 if key==ord('q'):
                     self.stop_preview()
                     
                 elif key == ord('r'):
                     self.toggle_recording()
+                    
+                elif key == ord('e'):
+                    self.set_auto_exposure()
                     
                 elif key == ord('z'):
                     if self.preview_zoom_bbox:
@@ -376,8 +411,8 @@ class myCamera:
         self.recording_nframes = 0
         self.recording_start   = datetime.now()
 
-        filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
-       
+        filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo ).replace('DATETIME', datetime.now().strftime('%y%m%d%H%M') )
+        print('Recording... ' , filename )
         THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
 
         self.thread_recording = Thread(target = THREADFUN, daemon = True) 

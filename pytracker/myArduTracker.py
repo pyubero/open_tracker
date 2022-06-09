@@ -42,7 +42,7 @@ class myArduTracker:
         # ... we recommend to keep the status led blinking even during
         # ... the experiments, to check the PC-Arduino communication.
         # ... If the led stops blinking, communication has been interrupted.
-        self.start_blink_status()
+        # self.start_blink_status()
         
         
         
