@@ -49,7 +49,7 @@ cam.summary()
 
 #...
 
-cam.recording_filename = 'video_grad_5mM_sinCond_50ulOP50_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
+cam.recording_filename = 'video_grad_100mM_sinCond_50ulOP50_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
 cam.recording_format   = 'MP42'
 cam.recording_fps      = 2
 cam.recording_totaltime=  1.5*3600  #... in seconds
