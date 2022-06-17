@@ -313,19 +313,12 @@ class myCamera:
                 font     = cv2.FONT_HERSHEY_SIMPLEX
                 frame    = cv2.putText(frame, fps_text,  (20,20), font, 0.5, color, 1, cv2.LINE_AA )
                 frame    = cv2.putText(frame, temp_text, (20,40), font, 0.5, color, 1, cv2.LINE_AA )
-                h,w,_ = frame.shape
-                cv2.line(frame, 
-                            ( int(0.45*w), int(h/2) ) ,
-                            ( int(0.55*w), int(h/2) ),
-                            color, 1) 
-                cv2.line(frame, 
-                            ( int(w/2), int(0.45*h) ) ,
-                            ( int(w/2), int(0.55*h) ),
-                            color, 1) 
+                frame    = self.__draw_crossbar(frame, cb_size=0.05)
+                                            
                 # Draw some text with information on the main frame
                 if self.thread_recording_running:
                     rec_text = '[REC %ds]' % self.recording_time
-                    cv2.putText(frame, rec_text, (20,60), font, 0.5, color, 20, cv2.LINE_AA )
+                    cv2.putText(frame, rec_text, (20,60), font, 0.5, color, 1, cv2.LINE_AA )
                    
                     
                     
@@ -396,7 +389,21 @@ class myCamera:
         sleep(0.5)
         
     
-    
+    ## Drawing functions
+    def __draw_crossbar( self, frame, cb_size=0.05)
+        h , w = frame.shape[:2]
+        value_sup = 0.5 + cb_size
+        value_inf = 0.5 - cb_size
+        cv2.line(frame, 
+                    ( int(value_inf*w), int(h/2) ) ,
+                    ( int(value_sup*w), int(h/2) ),
+                    color, 1) 
+        cv2.line(frame, 
+                    ( int(w/2), int(value_inf*h) ) ,
+                    ( int(w/2), int(value_sup*h) ),
+                    color, 1) 
+        return frame
+
     #################################
     ########## RECORDINGS ###########
     def start_recording(self, filename=None, fmt=None, total_time=None, fps=None ):
