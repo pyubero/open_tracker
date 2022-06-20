@@ -390,10 +390,11 @@ class myCamera:
         
     
     ## Drawing functions
-    def __draw_crossbar( self, frame, cb_size=0.05)
+    def __draw_crossbar( self, frame, cb_size=0.05):
         h , w = frame.shape[:2]
         value_sup = 0.5 + cb_size
         value_inf = 0.5 - cb_size
+        color = (0,0,255)
         cv2.line(frame, 
                     ( int(value_inf*w), int(h/2) ) ,
                     ( int(value_sup*w), int(h/2) ),
