@@ -26,10 +26,10 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 # Variables que no van a cambiar
-VIDEO_PATH  = 'test_video.avi' #'video_grad_5mM_sinCond_50ulOP50_2206091243_000.avi'#'video_2206071634_001.mkv'
+VIDEO_PATH  = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000.avi'#'video_2206071634_001.mkv'
 BG_FRAMES   = 99
-MIN_AREA    = 20
-MAX_AREA    = 400
+MIN_AREA    = 10
+MAX_AREA    = 40000
 BLUR_SIZE   = 5
 FORMFACTOR  = 1
 MAX_FRAMES  = 1000
@@ -179,7 +179,7 @@ _h , _w , _ = frame.shape
 
 
 # ... y cargamos el fondo
-fondo = generate_background(video, NIMGS = 300 )
+# fondo = generate_background(video, NIMGS = 300 )
 fondo = load_background()
 fondo = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
 plate = detect_plate( fondo , size_ratio=1.4)

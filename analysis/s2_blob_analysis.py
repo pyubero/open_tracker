@@ -52,9 +52,13 @@ for jj, blob in enumerate( blobs800 ):
     HU[jj,:] = cv2.HuMoments(M)[:,0]
 
 
-x = MOM[:,0]
-y = MOM[:,2]
 
+
+
+x = MOM[:,0]
+y = MOM[:,1]
+
+plt.figure( dpi=300)
 plt.plot( x, y,'.')
 for i in range(num_blobs):
     plt.gca().annotate( i, (x[i], y[i]) )
@@ -62,7 +66,7 @@ for i in range(num_blobs):
 
 blob_idx = 200
 
-img = np.zeros( (50,50), dtype='uint8')
+img = np.zeros( (100,100), dtype='uint8')
 
 _centroid= np.min(blobs800[blob_idx], axis=0)
 
@@ -71,5 +75,7 @@ img = cv2.drawContours(img, [ blobs800[blob_idx]-_centroid,], -1, (255,255,255) 
 plt.figure()
 plt.imshow(img)
 
+moms_img = cv2.HuMoments( cv2.moments( img ))[:,0]
+moms_cnt = cv2.HuMoments( cv2.moments( blobs800[blob_idx] ))[:,0]
 
-
+print(moms_img[-1], moms_cnt[-1])
