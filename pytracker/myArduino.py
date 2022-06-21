@@ -180,9 +180,25 @@ class myArduino:
 
 ##########################################################
 ################# SOME UTILITY FUNCTIONS #################
-def find_devices():
-    return [comport.device for comport in serial.tools.list_ports.comports()]
+def find_devices(filter_name =None , filter_value =None):
+    comports = serial.tools.list_ports.comports()
+    
+    if filter_value is not None:
+        if filter_name == 'pid':
+            return [ port.name for port in comports if port.pid == filter_value ]
+        if filter_name == 'vid':
+            return [ port.name for port in comports if port.pid == filter_value ]
+        else:
+            print('<W> Please introduce a valid filter_name either "vid" or "pid".')
+            return 
+    else:
+        return [comport.device for comport in serial.tools.list_ports.comports()]
      
+
+def find_arduinos( filter_name = 'pid', filter_value = 29987):
+    return find_devices( filter_name=filter_name, filter_value=filter_value)
+
+
 
 def a2r( A , rvd = 10_000, vd=+1, **kwargs):
     '''This function returns the resistance measured at a voltage divider in units of Rvd.

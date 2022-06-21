@@ -11,3 +11,4 @@
 *.FCStd1
 pytracker/__pycache__/
 
+*.exe
