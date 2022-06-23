@@ -9,7 +9,6 @@ from pymata4 import pymata4
 import serial.tools.list_ports
 import numpy as np
 from time import sleep
-import threading
 from threading import Thread
 from datetime import datetime
 
@@ -31,7 +30,9 @@ class myArduTracker:
         
         # Initialization
         self.define_pinout()
+        self.set_pin_modes()
         self.define_ntc_props()
+        
         #... threads
         self.__setup_pot_link()
         self.__setup_temperature_control()
@@ -109,25 +110,31 @@ class myArduTracker:
             return self.board.servo_write(pin_number, value)
     
     
-    def close(self):
+    def close(self, analog=None , digital=None ):
         # Stop all threads
         if self.thread_led_status_running:
             self.thread_led_status_running = False
             self.thread_led_status.join() 
             
-
+        if analog is None:
+            analog = range( self.total_analog_pins)
+            
+        if digital is None:
+            digital = range( self.total_digital_pins)
+            
+            
         # Disable all analog and digital reportings
-        for pin in range( self.total_analog_pins):
+        for pin in analog:
             self.board.disable_analog_reporting(pin)
             sleep(0.1)
         
-        for pin in range( self.total_digital_pins):
+        for pin in digital:
             self.board.disable_digital_reporting(pin)
             sleep(0.1)
         
         
         # Turn off all digital pins
-        for pin in range(self.total_digital_pins):
+        for pin in digital:
             self.write(pin, 0)
             sleep(0.1)
         
@@ -208,9 +215,7 @@ class myArduTracker:
         else:
             self.pinout = pinout
         
-        # Anyhow, reset pin modes
-        self.set_pin_modes()
-            
+
             
     def set_pin_modes(self):
         #... digital outputs, BINARY
@@ -405,9 +410,23 @@ class myArduTracker:
 
 ##########################################################
 ################# SOME UTILITY FUNCTIONS #################
-def find_devices():
-    return [comport.device for comport in serial.tools.list_ports.comports()]
-     
+def find_devices(filter_name =None , filter_value =None):
+    comports = serial.tools.list_ports.comports()
+    
+    if filter_value is not None:
+        if filter_name == 'pid':
+            return [ port.name for port in comports if port.pid == filter_value ]
+        if filter_name == 'vid':
+            return [ port.name for port in comports if port.pid == filter_value ]
+        else:
+            print('<W> Please introduce a valid filter_name either "vid" or "pid".')
+            return 
+    else:
+        return [comport.device for comport in serial.tools.list_ports.comports()]
+      
+def find_arduinos( filter_name = 'pid', filter_value = 29987):
+    return find_devices( filter_name=filter_name, filter_value=filter_value)
+
 
 def a2r( A , rvd = 10_000, vd=+1, **kwargs):
     '''This function returns the resistance measured at a voltage divider in units of Rvd.

@@ -6,22 +6,16 @@ Created on Wed Aug 25 15:27:39 2021
 """
 
 from pymata4 import pymata4
-from PyQt5 import QtWidgets, QtCore, uic
+from PyQt5 import QtWidgets, uic
 from PyQt5.QtCore import QTimer
 import serial.tools.list_ports
 import sys
 from time import sleep
 import numpy as np
-import random
-
 import matplotlib
-matplotlib.use('Qt5Agg')
-
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-
-BAUDRATE = 28800
 
 def find_devices():
     return [comport.device for comport in serial.tools.list_ports.comports()]
@@ -158,7 +152,7 @@ class Ui(QtWidgets.QMainWindow):
             
             try:
                 # open board
-                self.board = pymata4.Pymata4( com_port = comport, baud_rate=BAUDRATE )
+                self.board = pymata4.Pymata4( com_port = comport, baud_rate=28800 )
                 
                 # define all digital pins as outputs
                 _ = [ self.board.set_pin_mode_digital_output(jj) for jj in (2,4,7,8,12,13) ]
@@ -343,10 +337,13 @@ class Ui(QtWidgets.QMainWindow):
         self.list_comports.setEnabled(not value)
         self.pb_reload_comports.setEnabled(not value)
                 
-        
-app = QtWidgets.QApplication(sys.argv) # Create an instance of QtWidgets.QApplication
-window = Ui() # Create an instance of our class
-app.exec_() # Start the application
+
+if __name__ == '__main__':
+    matplotlib.use('Qt5Agg')
+    
+    app = QtWidgets.QApplication(sys.argv) # Create an instance of QtWidgets.QApplication
+    window = Ui() # Create an instance of our class
+    app.exec_() # Start the application
 
 
 

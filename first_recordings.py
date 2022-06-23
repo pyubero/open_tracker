@@ -41,7 +41,7 @@ cam = myCamera.myCamera(0)
 # Set some properties
 cam.set('width', 2592)
 cam.set('height', 1944)
-cam.set('exposure', 7395) # good values are 1775, 3563, 4832, 5597, 7395
+cam.set('exposure', 36964) # good values are 1775, 3563, 4832, 5597, 7395
 
 
 frame = cam.snapshot()
@@ -49,7 +49,7 @@ cam.summary()
 
 #...
 
-cam.recording_filename = 'video_grad_100mM_Cond_100ulOP50_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
+cam.recording_filename = './videos/DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
 cam.recording_format   = 'MP42'
 cam.recording_fps      = 2
 cam.recording_totaltime=  1.5*3600  #... in seconds
