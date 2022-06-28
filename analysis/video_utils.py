@@ -4,7 +4,7 @@ Created on Thu Jun 23 13:33:00 2022
 
 @author: Pablo
 """
-
+import os
 import cv2
 import json
 import pickle
@@ -16,8 +16,8 @@ from tqdm import tqdm
 
 
 
-def generate_background( videoCapture, n_imgs = 0, processing = None ):
-    nframes = int(videoCapture.get(cv2.CAP_PROP_FRAME_COUNT)/5)
+def generate_background( videoCapture, n_imgs = 0, skip=0, processing = None ):
+    nframes = int(videoCapture.get(cv2.CAP_PROP_FRAME_COUNT))-2
     if n_imgs <= 0:
         n_imgs = nframes
     elif n_imgs > nframes:
@@ -48,7 +48,11 @@ def generate_background( videoCapture, n_imgs = 0, processing = None ):
             gray = processing(gray)
             
         fondo_[:,:,1+ii] = gray
-    
+        
+        # skip some frame
+        for _ in range(skip):
+            ret, frame = videoCapture.read()
+            
     # 2. Calcular el fondo como la mediana de fondo_ sobre el eje temporal (axis=2)
     fondo = np.median( fondo_, axis=2).astype('uint8')
     
@@ -162,12 +166,13 @@ def load_contour_from_image(filename, idx=0):
     cnt, _    = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     return cnt[idx]
 
-def clear_dir(dirpath):
+def clear_dir(dirpath, delete = False):
     if os.path.isdir( dirpath):
-        print('Folder %s found...' % OUTPUT)
-        print('... deleting files.')
-        files = os.listdir(dirpath)
-        _ = [os.remove( os.path.join( dirpath, file) ) for file in files ]    
+        print('Folder %s found...' % dirpath)
+        if delete:
+            print('... deleting files.')
+            files = os.listdir(dirpath)
+            _ = [os.remove( os.path.join( dirpath, file) ) for file in files ]    
     else:    
         os.mkdir(dirpath)
         print("New directory %s created." % dirpath)
