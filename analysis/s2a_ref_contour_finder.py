@@ -22,7 +22,7 @@ msg1 = "Welcome to ref_contour_finder.\n"+\
        "as ideal as possible, and then press S to export it. The same reference\n"+\
        "can then be used throughout different videos.\n"\
        "Press P to skip a frame\n"+\
-f       "Press S to export the current contour\n"+\
+       "Press S to export the current contour\n"+\
        "Press Q to quit."
        
 

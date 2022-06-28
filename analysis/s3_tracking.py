@@ -3,6 +3,8 @@
 Created on Thu Jun 23 09:59:54 2022
 
 @author: Pablo
+With ~600 worms in the video, ~4 fps
+With ~60 worms in the video,  ~60fps
 """
 
 import os
@@ -18,19 +20,67 @@ from sklearn.mixture import GaussianMixture
 import video_utils as vutils
 
 
+
 # ... Filenames ... 
-BLOB_FILENAME     = 'video_data_blobs.pkl'
+DIR_NAME          = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000'
+BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = 'video_reference_contour.pkl'
+TRAJ_FILENAME     = os.path.join( DIR_NAME, 'trajectories.pkl')
 
 # ... General parameters ...
-HU_THRESH         = 1e-10
-METRIC_THRESH = 5 #3.85
-AREA_MIN      = 40
-AREA_MAX      = 115
-MAX_SPEED     = 5
-
+HU_THRESH     = 1e-10
+METRIC_THRESH = 3.50
+AREA_MIN      = 50
+AREA_MAX      = 150
+SPEED_DUMP    = 0.5     #... dumping parameter of speed in the Kalman filter
+WAIT_TIME     = 1
+VERBOSE  = False
 # ... Output ...
 WORMS = []
+COLORS= []
+
+#.............................................................................#
+class Worm:
+    def __init__(self, starting_position, t0=0):
+        self.t0= t0
+        self.x = starting_position[0]*np.ones((4,), dtype='uint8')
+        self.y = starting_position[1]*np.ones((4,), dtype='uint8')
+        # self.__update_speed()
+        
+    # def __update_speed(self):
+    #     self.vx = np.diff(self.x)
+    #     self.vy = np.diff(self.y)
+        
+    def coordinates(self, mode='cartesian'):
+        if mode =='cartesian':
+            return np.array( [ self.x, self.y ] ).T
+        if mode =='polar':
+            r = np.sqrt(np.sum(self.coordinates()**2, axis=1))    
+            z = np.arctan2( self.y, self.x)
+            return np.array( [r, z]).T
+    
+    def speed(self):
+        return np.array( [np.diff(self.x), np.diff(self.y)] ).T
+    
+    def speed_module(self):
+        return np.sqrt(np.sum(self.speed()**2, axis=1))
+    
+    def speed_angle(self):
+        return np.arctan2( np.diff(self.y), np.diff(self.x) )
+    
+    def update(self, new_position):
+        self.x = np.append( self.x, new_position[0] )
+        self.y = np.append( self.y, new_position[1] )
+        # self.__update_speed()
+        
+    def expected_position(self, alpha=1):
+        return self.coordinates()[-1] + alpha*self.speed()[-1]
+        
+
+## Now, the class MultiWormTracker should have an api similar to opencv's trackers.
+
+
+
 
 
 
@@ -47,84 +97,149 @@ HU_REF = vutils.logHu( CNT_REF, HU_THRESH )
 
 drawing_points=[]
 drawing_colors=[]
-def new_worm(contour):
-    _center = vutils.centroid(contour)
-    x = [_center[0]]*3
-    y = [_center[1]]*3
-    return [x,y]
 
-for t in tqdm(range(n_frames)):
-    
+
+tStart = datetime.now()
+for t in tqdm(range(n_frames)):    
     contours = CONTOURS[t]
-    blobs_t = np.array( [ vutils.centroid(c) for c in contours] )
-    blobs_used = []
     
-    worms_t_1=[]
+    # I need the centroid of blobs available in time t 
+    #        the  area    of blobs available in time t
+    #        the worms present at time t-1
+    #        the speed of worms at time t-1
+    #        the expected position of worms at time t
+    
+    blobs_t  = np.array( [ vutils.centroid(c) for c in contours] )
+    blobs_t_area= np.array( [cv2.contourArea(c) for c in contours ] )
+    worms_t_1= []
+    worms_speed_t_1 = []
+    worms_expected_t= []
+    
     for worm in WORMS:
-        vx = np.clip( worm[0][-1]-worm[0][-2], -MAX_SPEED,MAX_SPEED)
-        vy = np.clip( worm[1][-1]-worm[1][-2], -MAX_SPEED,MAX_SPEED)
-        
-        x_exp = worm[0][-1] + vx
-        y_exp = worm[1][-1] + vy
-        worms_t_1.append( [x_exp, y_exp ])
+        worms_t_1.append( worm.coordinates()[-1] )
+        worms_speed_t_1.append( worm.speed()[-1] )
+        worms_expected_t.append( worm.coordinates()[-1] + SPEED_DUMP*worm.speed()[-1] )
+
+    # ... convert to numpy arrays
+    worms_t_1 = np.array( worms_t_1 )
+    worms_speed_t_1 = np.array(worms_speed_t_1)
+    worms_expected_t= np.array( worms_expected_t )
     
-    
+
     # jj es el worm index de los que FIJO existen t-1 y por tanto en t
     # idx es el worm index de los worms putativos en t
-    # ...
-    worms_t_1 = np.array( worms_t_1 )
-    for jj, worm in enumerate( worms_t_1 ):
-        dist = np.sqrt( np.sum( ( worm - blobs_t )**2, axis=1) )
-        if np.any( dist<50) :
+    blobs_t_used = []
+    blobs_t_disp = blobs_t.copy()
+    worms_t_1_disp= np.array(range(len(WORMS)))
+    
+    radii = np.linspace(0,20,10)
+
+    # By looping across radii, I do a progressive scan to identify proximal worms
+    for _radius in radii:
+        
+        # Then for each worm that has not been tracked...        
+        for worm_jj in worms_t_1_disp.copy():
+            
+            #... I compute its distance to all blobs
+            dist = np.sqrt( np.sum( ( worms_expected_t[worm_jj] - blobs_t_disp )**2, axis=1) )
+            
+            #... if any blob is closer than _radius
+            if np.any( dist < _radius ):
+                
+                #... identify the most proximal blob
+                idx = np.argmin(dist)
+                
+                #... link worm_jj to blob idx
+                WORMS[ worm_jj ].update( blobs_t[idx] )
+                
+                #... and then make blob_t[idx] unavailable and mark idx as used
+                blobs_t_used.append(idx)
+                blobs_t_disp[idx][0] = 999999
+                blobs_t_disp[idx][1] = 999999
+                
+                #... and delete worm_jj from the "to-track" list
+                worms_t_1_disp = np.delete( worms_t_1_disp, np.where(worms_t_1_disp==worm_jj) ) 
+                
+                # Print some output
+                if VERBOSE:
+                    print('[%d] Linked worm %d to blob %d at distance %1.1f' % (t, worm_jj, idx, dist[idx]) )
+    
+    # Then, there will still be some un-tracked worms, waiting... in the dark...
+    if VERBOSE:
+        print('Untracked worms:', worms_t_1_disp)
+    
+    # BUT, untracked worms that are suspiciously close to unused blobs (perhaps large ones) should be linked together            
+    for worm_jj in worms_t_1_disp:
+        dist = np.sqrt( np.sum( ( worms_expected_t[worm_jj] - blobs_t )**2, axis=1) )
+        if np.any( dist < 40 ):
+            #... link worm_jj to blob idx
             idx = np.argmin(dist)
-            # Linking of jj worm in t-1 to idx blob in t
-            WORMS[jj][0].append( blobs_t[idx][0] )
-            WORMS[jj][1].append( blobs_t[idx][1] )
-            blobs_used.append(idx)
-            print('[%d] Linked %d worm to blob %d' % (t, jj, idx) )
-        else:
-            # Linking of jj worm in t-1 to its potential place in t
-            # ... the worm is probably being occluded
-            WORMS[jj][0].append( worms_t_1[jj][0] )
-            WORMS[jj][1].append( worms_t_1[jj][1] )
-            
-            
+            WORMS[ worm_jj ].update( blobs_t[idx] )
+            if VERBOSE:
+                print('--- Linked worm %d to blob %d at distance %1.1f' % (worm_jj, idx, dist[idx]) )
           
     
-    # Prepare show image
+    # Reconstruct image from contours
     frame = np.zeros((1944, 2592,3), dtype='uint8')
     cv2.drawContours(frame, contours, -1, (255,255,255), -1, cv2.LINE_AA)
-    # draw circle around current worms in yellow
-    _ = [cv2.circle(frame, ( w[0][-1], w[1][-1]), 15, drawing_colors[jj].tolist(), 2) for jj, w in enumerate(WORMS)]
-    _ = [cv2.line(frame, (w[0][-1],w[1][-1]), worms_t_1[jj], (0,0,255), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS)]
     
-    frame = vutils.zoom_in(frame, (1200,1000), 2)
+    #... draw circle around current worms in yellow
+    _ = [cv2.circle(frame, ( int(w.x[-1]), int(w.y[-1])), 15, COLORS[jj].tolist(), 2) for jj, w in enumerate(WORMS)]
+    _ = [cv2.putText(frame, "%d" % jj, ( int(w.x[-1]+10), int(w.y[-1]-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[jj].tolist(), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS)]
+    _ = [cv2.putText(frame, "%d" % jj, vutils.centroid(c), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2, cv2.LINE_AA) for jj, c in enumerate(contours)]
+    # # _ = [cv2.line(frame, (w.x[-1],w.y[-1]), worms_t_1[jj], (0,0,255), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS)]
+    
+    #... zoom in and resize output
+    frame = vutils.zoom_in(frame, [0.5,0.5] , 1.5)
     frame = cv2.resize(frame, (800,600))
+    
+    #... add frame number label
     cv2.putText(frame,  "frame : %d" % t,
                 (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 1, cv2.LINE_AA)
     
-    
-    cv2.imshow('wdw', frame)
-    
-    if cv2.waitKey(1)==ord('q'):
+    #... display image
+    cv2.imshow('wdw', frame)    
+    key = cv2.waitKey( WAIT_TIME )
+    if key==ord('q'):
         break
+    if key==ord('p'):
+        WAIT_TIME = 1 - WAIT_TIME
+    
     
     # These are the blobs that are potentially new, solitary, worms
-    blobs_left = [jj for jj in range(len(blobs_t)) if jj not in blobs_used ]
+    blobs_left = [jj for jj in range(len(blobs_t)) if jj not in blobs_t_used ]
     
     for jj in blobs_left:
         cnt = contours[jj]
         if vutils.is_worm(cnt, HU_REF, METRIC_THRESH, AREA_MIN, AREA_MAX, hu_thold=HU_THRESH) :
-            WORMS.append( new_worm(cnt) )
-            drawing_colors.append( np.random.randint(255, size=(3,)) )
+            _position = vutils.centroid(cnt)
+            
+            WORMS.append( Worm(_position, t0=t) )
+            COLORS.append( np.random.randint(255, size=(3,)) )
 
     
     
 cv2.destroyAllWindows()
 
-plt.figure(dpi=600)
-for w in WORMS:
-    plt.plot( w[0], w[1],'.-' , ms=3)
-plt.xlim(500,1500)
-plt.ylim(500,1500)
+print('---------------------------------')
+print('Analysis speed: %1.3f fps'% (t/(datetime.now()-tStart).total_seconds() )  )
+print('Number of worms at the end: %d' % len(WORMS) )
 
+plt.figure(dpi=600, figsize=(12,4))
+plt.subplot(1,2,1)
+for w in WORMS[:4]:
+    plt.plot( w.x, w.y,'.-' , ms=3)
+# plt.xlim(500,1500)
+# plt.ylim(500,1500)
+
+plt.subplot(1,2,2)
+plt.hist( WORMS[0].speed_module(), alpha=0.5, density=True)
+plt.hist( WORMS[3].speed_module(), alpha=0.5, density=True)
+plt.yscale('log')
+
+
+ks_2samp(WORMS[0].speed_module(), WORMS[3].speed_module())
+
+
+with open(TRAJ_FILENAME,'wb') as f:
+    pickle.dump( WORMS, f)

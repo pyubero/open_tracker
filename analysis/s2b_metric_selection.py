@@ -16,8 +16,8 @@ from scipy.stats import ks_2samp
 from sklearn.mixture import GaussianMixture
 import video_utils as vutils
 
-
-BLOB_FILENAME     = 'video_data_blobs.pkl'
+DIR_NAME          = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000'
+BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = 'video_reference_contour.pkl'
 OUTPUT            = './video_likely_worms'
 NMAX              = 100
