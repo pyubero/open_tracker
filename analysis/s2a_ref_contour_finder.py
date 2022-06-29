@@ -5,7 +5,7 @@ Created on Thu Jun 23 09:49:13 2022
 @author: Pablo
 """
 
-
+import os
 import cv2
 import json
 import pickle
@@ -27,14 +27,14 @@ msg1 = "Welcome to ref_contour_finder.\n"+\
        
 
     
-       
-BLOB_FILENAME   = 'video_data_blobs.pkl'
-OUTPUT_FILENAME = 'video_reference_contour'
+PROJECT_NAME    = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000'# 'SampleVideo'       
+BLOB_FILENAME   = os.path.join(PROJECT_NAME, 'video_data_blobs.pkl' ) 
+OUTPUT_FILENAME = os.path.join(PROJECT_NAME, 'video_reference_contour')
 #536 0
 
 print(msg1)
 print('')
-print('Loading data from %s...' % BLOB_FILENAME)
+print('Loading data from %s...' % BLOB_FILENAME )
 with open( BLOB_FILENAME, 'rb') as f:
     CONTOURS = pickle.load( f) 
     n_frames = len(CONTOURS)

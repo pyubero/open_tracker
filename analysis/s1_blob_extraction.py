@@ -33,6 +33,7 @@ import video_utils as vutils
 VIDEO_PATH  = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000.avi'
 # VIDEO_PATH      = 'test_video.avi'
 # VIDEO_PATH      = '2206211503_000.avi'
+# VIDEO_PATH = 'SampleVideo.avi'
 OUTPUT_FILENAME = 'video_data_blobs'
 BKGD_FILENAME   = 'video_fondo'
 BG_FRAMES   = 199
@@ -43,7 +44,7 @@ BLUR_SIZE   = 5
 FORMFACTOR  = 1
 MAX_FRAMES  = 999999
 USE_MOG = False
-GENERATE_BACKGROUND = True
+GENERATE_BACKGROUND = False
 
 # Output variables
 CONTOURS  = [] 
@@ -156,7 +157,7 @@ while ret:
     
     cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),2)
 
-    output = vutils.zoom_in( output, [0.5, 0.5], 2)
+    # output = vutils.zoom_in( output, [0.5, 0.5], 2)
     output = cv2.resize( output, (800, 600) )
     output = cv2.putText( output, "%d" % curr_frame, (20,40), font, fontsize, color, thickness, cv2.LINE_AA)
 

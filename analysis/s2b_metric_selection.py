@@ -16,10 +16,11 @@ from scipy.stats import ks_2samp
 from sklearn.mixture import GaussianMixture
 import video_utils as vutils
 
+# DIR_NAME          = 'SampleVideo'
 DIR_NAME          = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
-BLOB_REF_FILENAME = 'video_reference_contour.pkl'
-OUTPUT            = './video_likely_worms'
+BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
+OUTPUT            = os.path.join( DIR_NAME, './video_likely_worms')
 NMAX              = 100
 HU_THRESH         = 1e-10
 
@@ -32,14 +33,6 @@ with open( BLOB_FILENAME, 'rb') as f:
 print('Loading reference blob...')
 with open( BLOB_REF_FILENAME, 'rb') as f:
     CNT_REF = pickle.load(f)
-
-
-# Load contour ref from image model
-# CNT_REF = vutils.load_contour_from_image('model.png', idx=0)
-
-# Clear a directory
-# vutils.clear_dir('./analysis')
-
 
 
 
