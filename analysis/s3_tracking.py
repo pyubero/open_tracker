@@ -12,7 +12,6 @@ import cv2
 import pickle
 import numpy as np
 from datetime import datetime
-from matplotlib import pyplot as plt
 from tqdm import tqdm
 from video_utils import MultiWormTracker
 import video_utils as vutils

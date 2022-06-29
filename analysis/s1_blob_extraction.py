@@ -19,70 +19,70 @@ For more info, please visit
 """
 import os
 import cv2
-import json
 import pickle
 import numpy as np
 from datetime import datetime
-from matplotlib import pyplot as plt
-from tqdm import tqdm
 import video_utils as vutils
 
 
 
-# Variables que no van a cambiar
+# ... Filenames ... 
 VIDEO_PATH  = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000.avi'
-# VIDEO_PATH      = 'test_video.avi'
-# VIDEO_PATH      = '2206211503_000.avi'
-# VIDEO_PATH = 'SampleVideo.avi'
 OUTPUT_FILENAME = 'video_data_blobs'
 BKGD_FILENAME   = 'video_fondo'
-BG_FRAMES   = 199
-BG_SKIP     = 10
-MIN_AREA    = 10
-MAX_AREA    = 40000
-BLUR_SIZE   = 5
-FORMFACTOR  = 1
-MAX_FRAMES  = 999999
-USE_MOG = False
-GENERATE_BACKGROUND = False
 
-# Output variables
+# ... General parameters ...
+BG_FRAMES   = 199      #... number of frames to model the background
+BG_SKIP     = 10       #... number of discarded frames during background creation
+MIN_AREA    = 10       #... minimum contour area, helps ignore salt and pepper noise
+MAX_AREA    = 40000    #... maximum contour area
+BLUR_SIZE   = 5        #... Kernel size for blurring and opening/closing operations
+FORMFACTOR  = 1        #... form factor of output, typically 1
+MAX_FRAMES  = 999999   #... maximum number of frames to process (in case the video is super long)
+WAIT_TIME   = 1        #... wait time of each frame during the preview
+PLATE_SIZE  = 1.3      #... expected plate size relative to frame size
+ZOOM        = 1        #... zoom factor during the preview
+USE_MOG       = False  #... activate automatic background subtraction using MOG       
+GENERATE_BKGD = False  #... or generate "manual" and static background model
+
+# ... Output ...
 CONTOURS  = [] 
 
-# Style of annotations
+#... Style of annotations ...
 font     = cv2.FONT_HERSHEY_SIMPLEX
 fontsize = 1
 color    = (0, 255, 0)
 thickness = 1
 
-wait_time = 1 #... wait time of each frame during the preview
 
 
-
-# Create a separate folder
+# Step 0. Create a separate folder with the project data
 vutils.clear_dir( VIDEO_PATH.split('.')[0] )
 
 
-
-# Cargamos el video
+# Step 1. Load video
 video = cv2.VideoCapture( VIDEO_PATH )
 ret, frame = video.read()
 _h , _w , _ = frame.shape
 
 
-# ... y cargamos el fondo
-if GENERATE_BACKGROUND:
-    fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP )
+# Step 2. Generate or load the background
+if GENERATE_BKGD:
+    fondo = vutils.GENERATE_BKGD(video, n_imgs = BG_FRAMES, skip = BG_SKIP )
     cv2.imwrite( os.path.join( VIDEO_PATH.split('.')[0], BKGD_FILENAME+'.png'), fondo )
-    
-fondo = vutils.load_background( os.path.join( VIDEO_PATH.split('.')[0], BKGD_FILENAME+'.png') )
-fondo = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
 
-#... y detectamos la placa y creamos su máscara
-plate = vutils.detect_plate( fondo , size_ratio=1.3)
+if USE_MOG:
+    backSub = cv2.createBackgroundSubtractorMOG2()
+else:
+    fondo = vutils.load_background( os.path.join( VIDEO_PATH.split('.')[0], BKGD_FILENAME+'.png') )
+    fondo = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
+
+
+# Step 3. Detect plate...
+plate = vutils.detect_plate( fondo , size_ratio=PLATE_SIZE)
 print('Scale is: %1.2f px/mm' % (plate[2]/55) )
 
-# ... 
+# ... and create a mask.
 plate[2] = int(0.95*plate[2])
 mask_plate = np.zeros_like(fondo)
 mask_plate = cv2.circle(mask_plate, (plate[0],plate[1]), plate[2], (255,), -1)
@@ -95,84 +95,93 @@ mask_plate = cv2.circle(mask_plate, (plate[0],plate[1]), plate[2], (255,), -1)
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
 
-if USE_MOG:
-    backSub = cv2.createBackgroundSubtractorMOG2()
+
     
-    
+# Step 4. Start blob extraction
 video = cv2.VideoCapture( VIDEO_PATH )
 
 tStart = datetime.now()
-while ret:
+while True:
+    
+    #... load frame and exit if the video finished
     ret, frame = video.read()
 
     if not ret:
         break
     
-    
-    
+    #... resize frame if FORMFACTOR is different than 1
     if FORMFACTOR != 1:
         frame = cv2.resize( frame, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
         
+    #... compute current frame, and exit if MAX_FRAMES reached        
     curr_frame = video.get( cv2.CAP_PROP_POS_FRAMES )
     if curr_frame > MAX_FRAMES:
         break
     
+    #... convert frame to grayscale
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY )   
 
+    #... subtract background
     if USE_MOG:
         gray = backSub.apply(gray)
     else:    
         gray = cv2.subtract(fondo, gray)
     
+    # >>> PREPROCESSING I <<<
     gray = cv2.bitwise_and(gray, mask_plate)
     gray = vutils.adjust_gamma( gray, gamma=0.8)
     gray = cv2.medianBlur(gray, BLUR_SIZE)
     gray = vutils.auto_BC(gray)
     gray = vutils.adjust_gamma( gray, gamma=2.0)
 
+    # >>> PREPROCESSING II <<<
     _, thresh = cv2.threshold( gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU )
-    
-
-    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, np.ones((7,7), np.uint8) )
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, np.ones((BLUR_SIZE,BLUR_SIZE), np.uint8) )
     thresh = cv2.medianBlur(thresh, BLUR_SIZE)
 
-    
+    #... find and export contours
     cnt, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     cntArea = [cv2.contourArea(c) for c in cnt ]
     
-    
+    #... filter contours by area, and append them to the output variable
     filtered_contours = [ c for c in cnt if MIN_AREA < cv2.contourArea(c) < MAX_AREA ]
     CONTOURS.append(  filtered_contours) 
-    print( curr_frame, len(cnt), len(filtered_contours) )
     
     
     
+    # >>> PREVIEW <<<
+    # output = frame.copy()
+    output = gray.copy()
+    # output = thresh.copy()
     
-    output = thresh.copy()
+    #... convert to color if output is in grayscale
     if len( output.shape ) ==2:
         output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR )  
     
-    
+    #... draw a circle around every good contour
     _= [cv2.circle( output, vutils.centroid(c),20,(0,255,0),2) for c in filtered_contours]
     
+    #... draw a circle showing the estimated position of the plate
     cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),2)
 
-    # output = vutils.zoom_in( output, [0.5, 0.5], 2)
-    output = cv2.resize( output, (800, 600) )
+    
+    output = vutils.zoom_in( output, [0.5, 0.5], ZOOM)
+    output = cv2.resize( output, (1280, 960) )
     output = cv2.putText( output, "%d" % curr_frame, (20,40), font, fontsize, color, thickness, cv2.LINE_AA)
 
     cv2.imshow( 'window', output)
-    
-    
-    key = cv2.waitKey(wait_time)
-    
+    key = cv2.waitKey(WAIT_TIME)
     if key==ord('q'):
         break
     elif key==ord('p'):
-        wait_time = (1-wait_time)
+        WAIT_TIME = (1-WAIT_TIME)
+
+
+
 
 
 cv2.destroyAllWindows()
+
 
 speed = video.get( cv2.CAP_PROP_POS_FRAMES)/(datetime.now()-tStart).total_seconds()
 print('Analysis speed: %1.2f fps' % (speed) )
@@ -183,88 +192,3 @@ with open( os.path.join( VIDEO_PATH.split('.')[0], OUTPUT_FILENAME+'.pkl'), 'wb'
     pickle.dump(CONTOURS, f)   
    
     
-   
-if USE_MOG :
-    print('Frames in background history: %d' % backSub.getHistory())
-    print('Number of gaussians in mix:   %d' % backSub.getNMixtures())
-
-# # 5. Vaya, parece que funciona bien, pero los gusanos son muy oscuros!
-# # Mas info en: https://docs.opencv.org/4.x/d7/d4d/tutorial_py_thresholding.html
-# # Otsu's thresholding after Gaussian filtering, and some thinning
-# blur = cv2.GaussianBlur(final,(BLUR_SIZE,BLUR_SIZE),0)
-# ret,thresh = cv2.threshold( blur , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-
-# # Si los gusanos quedan muy thicc, se puede probar a erosionar la imagen binaria
-# # Mas info en https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html
-# #kernel = np.ones((3,3),np.uint8)
-# #eroded = cv2.erode( thresh , kernel , iterations = 1)
-
-# cv2.imshow( 'wdw', thresh )
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
-
-
-# # 6. Intenta contar cuantos gusanos hay:
-# # Mas info en https://docs.opencv.org/3.4/d4/d73/tutorial_py_contours_begin.html
-# # ... obtenemos los blobs/contornos
-# contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-# # ... contamos el area total y filtramos los contornos por area
-# total_contoured_area = np.sum([ cv2.contourArea(c) for c in contours])
-# filtered_contours = [c for c in contours if MIN_AREA<cv2.contourArea(c)<MAX_AREA ]
-# worm_areas = [ cv2.contourArea(c) for c in filtered_contours]
-
-# count_naive = len(filtered_contours)
-# count_better= total_contoured_area/np.mean(worm_areas)
-# error_better= count_better*np.std(worm_areas)/np.mean(worm_areas)
-# print('We find approximately %d worms.' % count_naive )
-# print('But computing by size we estimate n_worms = %1.2f +/- %1.2f' % (count_better, error_better) )
-
-
-
-
-
-# # 7. Reproducir video desde el principio restando el fondo
-# video = cv2.VideoCapture( VIDEO_PATH )
-# ret, frame = video.read()
-# for _ in tqdm(range( nframes )):
-#     # Convert to gray and subtract
-#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#     final = cv2.subtract(fondo, gray)
-    
-#     # Blur and threshold
-#     blur = cv2.GaussianBlur(final,(BLUR_SIZE,BLUR_SIZE),0)
-#     ret,thresh = cv2.threshold( blur , 0 , 255 , cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    
-#     # Find contours
-#     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    
-    
-#     # Count worms after filtering by area
-#     total_contoured_area = np.sum([ cv2.contourArea(c) for c in contours])
-#     filtered_contours = [c for c in contours if MIN_AREA<cv2.contourArea(c) ]
-#     worm_areas = [ cv2.contourArea(c) for c in filtered_contours]
-    
-#     count_naive = len(filtered_contours)
-#     count_better= total_contoured_area/np.mean(worm_areas)
-#     error_better= count_better*np.std(worm_areas)/np.mean(worm_areas)
-    
-#     NWORMS.append( count_better )
-    
-    
-#     newdim = (1280,960)
-#     output = frame
-#     cv2.drawContours( output, filtered_contours, -1, (0,255,0), cv2.LINE_4, 1 )
-#     cv2.imshow( 'wdw', cv2.resize( output, newdim) )
-#     if cv2.waitKey(1)==ord('q'):
-#         break
-    
-#     #... read next frame
-#     ret, frame = video.read()
-
-
-# cv2.destroyAllWindows()
-
-# plt.plot(NWORMS)
-# plt.xlabel('Time (frame)')
-# plt.ylabel('Number of moving worms')
-

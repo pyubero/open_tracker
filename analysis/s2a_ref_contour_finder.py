@@ -7,13 +7,9 @@ Created on Thu Jun 23 09:49:13 2022
 
 import os
 import cv2
-import json
 import pickle
 import numpy as np
-from datetime import datetime
 from matplotlib import pyplot as plt
-from tqdm import tqdm
-from scipy.stats import ks_2samp
 import video_utils as vutils
 
 msg1 = "Welcome to ref_contour_finder.\n"+\
@@ -23,6 +19,7 @@ msg1 = "Welcome to ref_contour_finder.\n"+\
        "can then be used throughout different videos.\n"\
        "Press P to skip a frame\n"+\
        "Press S to export the current contour\n"+\
+       "Press any other key to skip contour\n"+\
        "Press Q to quit."
        
 

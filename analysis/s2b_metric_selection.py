@@ -6,15 +6,13 @@ Created on Thu Jun 23 09:59:54 2022
 """
 import os
 import cv2
-import json
 import pickle
 import numpy as np
-from datetime import datetime
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from scipy.stats import ks_2samp
 from sklearn.mixture import GaussianMixture
 import video_utils as vutils
+
 
 # DIR_NAME          = 'SampleVideo'
 DIR_NAME          = 'video_grad_5mM_sinCond_50ulOP50_2206091243_000'
@@ -23,6 +21,7 @@ BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 OUTPUT            = os.path.join( DIR_NAME, './video_likely_worms')
 NMAX              = 100
 HU_THRESH         = 1e-10
+
 
 print('')
 print('Loading data from %s...' % BLOB_FILENAME)
