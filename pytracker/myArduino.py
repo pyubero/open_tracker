@@ -15,9 +15,9 @@ from datetime import datetime
 
 
 class myArduino:
-    def __init__(self, device):
+    def __init__(self, device, baudrate=28800):
         print('Initializing arduino...')
-        self.board = pymata4.Pymata4(com_port = device, baud_rate = 57600)
+        self.board = pymata4.Pymata4(com_port = device, baud_rate = baudrate)
         
         self.total_analog_pins = len(self.board.analog_pins)
         self.total_digital_pins = len(self.board.digital_pins) - self.total_analog_pins
@@ -28,7 +28,7 @@ class myArduino:
         self._blinking_running = [False    for _ in range(self.total_digital_pins) ]
         self.blink_threads     = [Thread() for _ in range(self.total_digital_pins) ]
         
-
+        self.__setup_blinking_leds()
         self.STATUS_LED_PIN = 13
 
 
@@ -58,21 +58,33 @@ class myArduino:
             self.board.set_pin_mode_servo(pin_number)
 
 
-    def close(self):
-        #Disable all analog and digital reportings
-        for pin in range( self.total_analog_pins):
+    def close(self, analog=None , digital=None ):
+        # Stop threads
+        if self.thread_led_status_running:
+            self.thread_led_status_running = False
+            self.thread_led_status.join() 
+            
+        if analog is None:
+            analog = range( self.total_analog_pins)
+            
+        if digital is None:
+            digital = range( self.total_digital_pins)
+            
+            
+        # Disable analog and digital reportings
+        for pin in analog:
             self.board.disable_analog_reporting(pin)
-            sleep(0.1)
+            sleep(0.02)
         
-        for pin in range( self.total_digital_pins):
+        for pin in digital:
             self.board.disable_digital_reporting(pin)
-            sleep(0.1)
+            sleep(0.2)
         
         
-        # Turn off all digital pins
-        for pin in range(self.total_digital_pins):
+        # Turn off digital pins
+        for pin in digital:
             self.write(pin, 0)
-            sleep(0.1)
+            sleep(0.02)
         
         
         self.board.shutdown()
