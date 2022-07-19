@@ -54,11 +54,11 @@ cam.summary()
 
 #...
 
-cam.recording_filename = './videos/no_cond_2h_TDC_1_sin_food_conNaCl_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
+cam.recording_filename = './videos/N2_chem_cond_2h_conNaCl_sin_food_grad100mM_4h_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
 cam.recording_format   = 'MP42'
 cam.recording_fps      = 2
-cam.recording_totaltime=  1.5*3600  #... in seconds
-cam.recording_maxtime  = 9999999999  #... in seconds
+cam.recording_totaltime= 3*3600  #... in seconds
+cam.recording_maxtime  = 1.5*3600  #... in seconds
 
 
 
@@ -79,9 +79,5 @@ cam.close()
 
 
 
-
-
-
-
-
+ 
 

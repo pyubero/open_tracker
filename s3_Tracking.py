@@ -21,7 +21,7 @@ import pytracker.video_utils as vutils
 
 
 # ... Filenames ... 
-DIR_NAME          = './videos/video_grad_100mM_sinCond_100ulOP50_000'
+DIR_NAME          = './videos/_cut'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 TRAJ_FILENAME     = os.path.join( DIR_NAME, 'trajectories.pkl')
@@ -30,13 +30,13 @@ BKGD_FILENAME     = os.path.join( DIR_NAME, 'video_fondo.png')
 
 # ... Reference calibration ...
 HU_THRESH     = 1e-10
-METRIC_THRESH = 3.0
-AREA_MIN      = 70
-AREA_MAX      = 120
+METRIC_THRESH = 2.2
+AREA_MIN      = 40
+AREA_MAX      = 170
 
 # ... General parameters ...
-SPEED_DAMP    = 0.8     
-MAX_STEP      = 25
+SPEED_DAMP    = 0.5 
+MAX_STEP      = 45
 WAIT_TIME     = 1
 VERBOSE  = False
 
@@ -47,7 +47,7 @@ FRAME_WIDTH = 2592
 FRAME_HEIGHT= 1944
 ZOOM        = 1.0
 TRUE_VIDEO  = False
-EXPORT_TRAJ = False
+EXPORT_TRAJ = True
 
 
 

@@ -13,10 +13,11 @@ from tqdm import tqdm
 
 #.............................................................................#
 class Worm:
-    def __init__(self, starting_position, t0=0, dtype='uint16'):
+    def __init__(self, starting_position, t0=0, c=None, dtype='uint16'):
         self.t0= t0
         self.x = starting_position[0]*np.ones((4,), dtype=dtype)
         self.y = starting_position[1]*np.ones((4,), dtype=dtype)
+        self.c = [c]
         self.dtype = dtype
         
     def coordinates(self, mode='cartesian'):
@@ -43,7 +44,11 @@ class Worm:
     def expected_position(self, alpha=1):
         return self.coordinates()[-1] + alpha*self.speed()[-1]
         
-
+    def update_contour(self, contour, autocenter=True):
+        if autocenter:
+            self.c.append( contour - np.min( contour, axis=0))
+        else:
+            self.c.append( contour )
 
 
 
@@ -103,6 +108,7 @@ class MultiWormTracker:
                     
                     #... link worm_jj to blob idx
                     self.WORMS[ worm_jj ].update( blobs_t[idx] )
+                    self.WORMS[ worm_jj ].update_contour( contours[idx] )
                     
                     #... and then make blob_t[idx] unavailable and mark idx as used
                     blobs_t_used.append(idx)
@@ -129,13 +135,23 @@ class MultiWormTracker:
             if np.any( dist < self.MAX_STEP ):
                 #... link worm_jj to blob idx
                 idx = np.argmin(dist)
+                worms_t_1_disp = np.delete( worms_t_1_disp, np.where(worms_t_1_disp==worm_jj) ) 
+
                 self.WORMS[ worm_jj ].update( blobs_t[idx] )
+                self.WORMS[ worm_jj ].update_contour( contours[idx] )
+
                 if self.VERBOSE:
                     print('--- Linked worm %d to blob %d at distance %1.1f' % (worm_jj, idx, dist[idx]) )
     
-        
+    
+        ###### 3. Keep worms alive ######
+        for worm_jj in np.random.permutation( worms_t_1_disp):
+            expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP )
+            self.WORMS[ worm_jj ].update( expected_position )
+            self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
 
-        ###### 3. New worm identification ######
+
+        ###### 4. New worm identification ######
         # These are the blobs that are potentially new, solitary, worms
         blobs_left = [jj for jj in range(len(blobs_t)) if jj not in blobs_t_used ]
         if self.IS_WORM is None:
@@ -152,8 +168,8 @@ class MultiWormTracker:
                 cnt = contours[blob_jj]
                 if self.IS_WORM(cnt):
                     _position = self.__centroid(cnt)
-                    self.WORMS.append( Worm(_position, t0 = self.N_CALLS) )
-            
+                    self.WORMS.append( Worm(_position, t0 = self.N_CALLS, c=cnt) )
+
          
         
 
@@ -174,7 +190,7 @@ def resize_video(filename, formfactor):
     
     
     # Create Video Writer
-    out_filename = '.'.join( [ filename.split('.')[0]+'_ff%1.2f' % formfactor, filename.split('.')[-1]] )
+    out_filename = '.'.join( [ filename.split('.')[-2]+'_ff%1.2f' % formfactor, filename.split('.')[-1]] )
     out = cv2.VideoWriter(out_filename,cv2.VideoWriter_fourcc('M','J','P','G'), 30, (width,height))
     
     
@@ -195,6 +211,47 @@ def resize_video(filename, formfactor):
     out.release()
 
 
+def cut_video(filename, start_frame=0, end_frame = -1 ):
+    # Open video
+    cv  = cv2.VideoCapture( filename )
+    nframes = cv.get( cv2.CAP_PROP_FRAME_COUNT )
+    
+    if (end_frame < 0) or (end_frame > nframes):
+        end_frame= nframes
+        
+    if start_frame>nframes:
+        print('< E > Start frame needs to be leq total frames.')
+        return None
+    
+    
+    #... get first frame
+    suc, frame = cv.read()
+    
+    height , width , c = frame.shape
+    
+    
+    
+    # Create Video Writer
+    out_filename = '.'.join( [ filename.split('.')[-2]+'_cut', filename.split('.')[-1]] )
+    out = cv2.VideoWriter(out_filename,cv2.VideoWriter_fourcc('M','P','4','2'), 30, (width,height))
+    
+    print('Exporting to %s' % out_filename)
+    # Then loop...
+    for i_frame in tqdm(range( int( nframes-1) )):
+        if  start_frame < i_frame:
+            out.write(frame)
+        
+        if i_frame > end_frame:
+            break
+        
+        if not suc: 
+            break   
+        
+        suc, frame = cv.read()
+        
+    cv.release()
+    out.release()
+    
 
 
 
@@ -216,7 +273,7 @@ def traj2matrix(trajectories):
 
 
 
-def generate_background( videoCapture, n_imgs = 0, skip=0, processing = None ):
+def generate_background( videoCapture, n_imgs = 0, skip=0, processing = None, mad=0 ):
     nframes = int(videoCapture.get(cv2.CAP_PROP_FRAME_COUNT))-2
     if n_imgs <= 0:
         n_imgs = nframes
@@ -255,8 +312,14 @@ def generate_background( videoCapture, n_imgs = 0, skip=0, processing = None ):
             
     # 2. Calcular el fondo como la mediana de fondo_ sobre el eje temporal (axis=2)
     fondo = np.median( fondo_, axis=2).astype('uint8')
-    
+    if mad != 0:
+        fondo_mad = np.median( np.abs( np.expand_dims(fondo,axis=-1).astype('float64') - fondo_ ), axis=2)
+        fondo = ( np.clip( fondo.astype('int32')-mad*fondo_mad, 0, 255) ).astype('uint8') 
+        
     return fondo
+
+
+
 
 def load_background( filename  ):
     fondo = cv2.imread(filename)
@@ -278,7 +341,7 @@ def adjust_gamma(image, gamma=1.2):
     # apply gamma correction using the lookup table
     return cv2.LUT(image, table) 
 
-def detect_plate(frame, size_ratio=1.0, mindist=100, blur_kernel=10):
+def detect_plate(frame, size_ratio=1.0, r0=[0.5,0.5], mindist=100, blur_kernel=10):
     height, width = frame.shape
     exp_radius = height/2*size_ratio
     
@@ -292,19 +355,30 @@ def detect_plate(frame, size_ratio=1.0, mindist=100, blur_kernel=10):
                                minRadius= int(0.8*exp_radius) ,
                                maxRadius= int(1.2*exp_radius) )
     
-    true_circles=[]
-    if circles is None:
-        return [0,0,99999]
-    for c in circles[0,:]:            
-        if (0.8*width/2)<c[0]<(1.2*width/2):
-            if (0.8*height/2)<c[1]<(1.2*height/2):
-                true_circles.append(c)
-    true_circles= np.array(true_circles)
-    print('Found %d good candidates' % len(true_circles))
-    
-        
-    idx = np.argmin( true_circles[:,2]-exp_radius*size_ratio)
-    return true_circles[idx].astype('int')
+    if circles is not None:
+        print('Found %d good candidates' % circles.shape[1] )
+
+        # Find closest circle to r0
+        dist = (circles[0,:,0]/width - r0[0] )**2 + (circles[0,:,1]/height - r0[1])**2
+        idx = np.argmin( dist)
+        return circles[0,idx,:].astype('int')
+    else:
+        return np.array([0,0,999]).astype('int')
+    # true_circles=[]
+    # if circles is None:
+    #     return [[0,0,99999]]
+    # for c in circles[0,:]:            
+    #     if (0.8*width/2)<c[0]<(1.2*width/2):
+    #         if (0.8*height/2)<c[1]<(1.2*height/2):
+    #             true_circles.append(c)
+    # true_circles= np.array(true_circles)
+    # print('Found %d good candidates' % len(true_circles))
+
+    # if len(true_circles)>0:
+    #     idx = np.argmin( true_circles[:,2]-exp_radius*size_ratio)
+    #     return true_circles[idx].astype('int')
+    # else:
+    #     return [0,0,99999]
     
 def zoom_in(frame, center, formfactor):
     if formfactor==1.0:

@@ -24,7 +24,7 @@ msg1 = "Welcome to ref_contour_finder.\n"+\
        
 
     
-PROJECT_NAME    = './videos/video_grad_100mM_sinCond_100ulOP50_000'# 'SampleVideo'       
+PROJECT_NAME    = './videos/_cut'# 'SampleVideo'       
 BLOB_FILENAME   = os.path.join(PROJECT_NAME, 'video_data_blobs.pkl' ) 
 OUTPUT_FILENAME = os.path.join(PROJECT_NAME, 'video_reference_contour')
 #536 0

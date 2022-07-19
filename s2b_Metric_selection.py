@@ -15,7 +15,7 @@ import pytracker.video_utils as vutils
 
 
 # DIR_NAME          = 'SampleVideo'
-DIR_NAME          = './videos/video_grad_100mM_sinCond_100ulOP50_000'
+DIR_NAME          = './videos/_cut'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 OUTPUT            = os.path.join( DIR_NAME, './video_likely_worms')

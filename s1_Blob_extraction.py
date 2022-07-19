@@ -21,30 +21,34 @@ import os
 import cv2
 import pickle
 import numpy as np
+from tqdm import tqdm
 from datetime import datetime
 from pytracker import video_utils as vutils
-
+from matplotlib import pyplot as plt
 
 
 # ... Filenames ... 
-DIR_PATH  = './videos/video_grad_100mM_sinCond_100ulOP50_000'
+DIR_PATH  = './videos/_cut'
 VIDEO_FILENAME  = DIR_PATH+'.avi'
 OUTPUT_FILENAME = os.path.join( DIR_PATH, 'video_data_blobs.pkl') 
 BKGD_FILENAME   = os.path.join( DIR_PATH, 'video_fondo.png')
 
 # ... General parameters ...
-BG_FRAMES   = 199      #... number of frames to model the background
-BG_SKIP     =  5       #... number of discarded frames during background creation
-MIN_AREA    = 10       #... minimum contour area, helps ignore salt and pepper noise
+SKIP_FRAMES = 400        #... skip a number of initial frames from the video
+BG_FRAMES   = 200      #... number of frames to model the background
+BG_SKIP     =  10      #... number of discarded frames during background creation
+MIN_AREA    = 20       #... minimum contour area, helps ignore salt and pepper noise
 MAX_AREA    = 40000    #... maximum contour area
 BLUR_SIZE   = 5        #... Kernel size for blurring and opening/closing operations
 FORMFACTOR  = 1        #... form factor of output, typically 1
 MAX_FRAMES  = 999999   #... maximum number of frames to process (in case the video is super long)
 WAIT_TIME   = 1        #... wait time of each frame during the preview
-PLATE_SIZE  = 1.5      #... expected plate size relative to frame size
+PLATE_SIZE  = 0.9      #... expected plate size relative to frame size
+CHUNK_SIZE  = 0.08
 ZOOM        = 1        #... zoom factor during the preview
-USE_MOG       = True  #... activate automatic background subtraction using MOG       
+USE_MOG       = False  #... activate automatic background subtraction using MOG       
 GENERATE_BKGD = False  #... or generate "manual" and static background model
+EXPORT_DATA   = True
 
 # ... Output ...
 CONTOURS  = [] 
@@ -69,9 +73,11 @@ _h , _w , _ = frame.shape
 
 # Step 2. Generate or load the background
 if GENERATE_BKGD:
-    fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP )
+    fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP, mad=3 )
+    # fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP )
     cv2.imwrite( BKGD_FILENAME, fondo )
-
+    print('Background created.')
+    
 if USE_MOG:
     backSub = cv2.createBackgroundSubtractorMOG2()
 
@@ -81,29 +87,36 @@ fondo = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
 
 
 # Step 3. Detect plate...
-plate = vutils.detect_plate( fondo , size_ratio=PLATE_SIZE, blur_kernel=10)
+plate = vutils.detect_plate( fondo , size_ratio=PLATE_SIZE, blur_kernel=20, r0=[0.5,0.5])
 print('Scale is: %1.2f px/mm' % (plate[2]/55) )
 
+chunk = vutils.detect_plate( fondo , size_ratio=CHUNK_SIZE, blur_kernel=10, r0=[0.2, 0.5])
+print('Scale is: %1.2f px/mm' % (chunk[2]/5) )
+
+
 # ... and create a mask.
-plate[2] = int(0.95*plate[2])
+plate[2] = int(1.0*plate[2])
 mask_plate = np.zeros_like(fondo)
 mask_plate = cv2.circle(mask_plate, (plate[0],plate[1]), plate[2], (255,), -1)
 
 
 # Uncomment to show masked ROI on the background
-# output = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
-# cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),2)
-# cv2.imshow('w', cv2.bitwise_and(output, mask_plate) )
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+output = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
+output = cv2.cvtColor( output, cv2.COLOR_GRAY2BGR) 
+cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),5)
+cv2.circle( output,(chunk[0], chunk[1]), chunk[2],(0,0,255),5)
+cv2.imshow('w', cv2.resize(output, (800,600) ) )
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
 
     
 # Step 4. Start blob extraction
 video = cv2.VideoCapture( VIDEO_FILENAME )
+n_frames= video.get( cv2.CAP_PROP_FRAME_COUNT )
 
 tStart = datetime.now()
-while True:
+for _ in tqdm(range(int(n_frames))):
     
     #... load frame and exit if the video finished
     ret, frame = video.read()
@@ -119,6 +132,8 @@ while True:
     curr_frame = video.get( cv2.CAP_PROP_POS_FRAMES )
     if curr_frame > MAX_FRAMES:
         break
+    elif curr_frame<SKIP_FRAMES:
+        continue
     
     #... convert frame to grayscale
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY )   
@@ -131,14 +146,15 @@ while True:
     
     # >>> PREPROCESSING I <<<
     gray = cv2.bitwise_and(gray, mask_plate)
-    gray = vutils.adjust_gamma( gray, gamma=0.8)
-    gray = vutils.auto_BC(gray)
+    gray = vutils.adjust_gamma( gray, gamma=0.7 )
     gray = cv2.medianBlur(gray, BLUR_SIZE)
-    gray = vutils.adjust_gamma( gray, gamma=2.0)
+    gray = vutils.adjust_gamma( gray, gamma=3.0)
+    gray = vutils.auto_BC(gray)
 
     # >>> PREPROCESSING II <<<
     _, thresh = cv2.threshold( gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU )
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, np.ones((BLUR_SIZE,BLUR_SIZE), np.uint8) )
+    # thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, np.ones((3,3), np.uint8) )
     # thresh = cv2.medianBlur(thresh, BLUR_SIZE)
 
     #... find and export contours
@@ -153,8 +169,8 @@ while True:
     
     # >>> PREVIEW <<<
     # output = frame.copy()
-    output = gray.copy()
-    # output = thresh.copy()
+    # output = gray.copy()
+    output = thresh.copy()
     
     #... convert to color if output is in grayscale
     if len( output.shape ) ==2:
@@ -165,6 +181,7 @@ while True:
     
     #... draw a circle showing the estimated position of the plate
     cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),2)
+    cv2.circle( output,(chunk[0], chunk[1]), chunk[2],(0,0,255),2)
 
     
     output = vutils.zoom_in( output, [0.5, 0.5], ZOOM)
@@ -188,9 +205,18 @@ cv2.destroyAllWindows()
 speed = video.get( cv2.CAP_PROP_POS_FRAMES)/(datetime.now()-tStart).total_seconds()
 print('Analysis speed: %1.2f fps' % (speed) )
 
-
-print('Data exported to %s.' % (OUTPUT_FILENAME+'.pkl') )
-with open( OUTPUT_FILENAME, 'wb') as f:
-    pickle.dump(CONTOURS, f)   
-   
+if EXPORT_DATA:
+    print('Data exported to %s.' % OUTPUT_FILENAME )
+    with open( OUTPUT_FILENAME, 'wb') as f:
+        pickle.dump(CONTOURS, f)   
+else:
+    print('Data not exported.')
     
+nworms = np.array([len(c) for c in CONTOURS] )
+plt.figure( figsize=(6,4), dpi=300)
+plt.plot( nworms)
+plt.xlabel('Number of frames')
+plt.ylabel('Number of worms')   
+
+print( np.mean( nworms[-20:]), np.std(nworms[-20:]))
+ 
