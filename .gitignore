@@ -10,5 +10,5 @@
 **FCStd1
 *.FCStd1
 pytracker/__pycache__/
-
+videos/
 *.exe

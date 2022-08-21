@@ -28,7 +28,8 @@ BKGD_FILENAME     = os.path.join( DIR_NAME, 'video_fondo.png')
 
 
 #... Parameters
-AVG_WDW = 4
+AVG_WDW = 1
+MIN_LENGTH    = 100
 
 def moving_average(x, w):
     return np.convolve(x, np.ones(w), 'valid') / w
@@ -37,21 +38,22 @@ def moving_average(x, w):
 
 # Import data
 with open(TRAJ_FILENAME,'rb') as f:
-    WORMS = pickle.load(f)
+    data = pickle.load(f)
 
+WORMS = [ worm for worm in data if len(worm.x)>MIN_LENGTH ]
 
-n_frames = len(WORMS[0].x)
+_nfalive = [ worm.t0+len(worm.x) for worm in WORMS ]
+n_frames = np.max(_nfalive)
 n_worms  = len(WORMS)
 
 data_xy = np.nan*np.zeros( (n_worms, n_frames-AVG_WDW+1, 2) )
 for i_worm, worm in enumerate( WORMS):
     length = len( worm.x)-AVG_WDW+1
-    data_xy[i_worm, -length:, 0] = moving_average( worm.x, AVG_WDW)
-    data_xy[i_worm, -length:, 1] = moving_average( worm.y, AVG_WDW)
+    ini = worm.t0
+    fin = ini + length
+    data_xy[i_worm, ini:fin, 0] = moving_average( worm.x, AVG_WDW)
+    data_xy[i_worm, ini:fin, 1] = moving_average( worm.y, AVG_WDW)
     
-
-
-
 
 
 data_vw = np.nan*np.zeros( (n_worms, n_frames-AVG_WDW, 2) )
@@ -60,7 +62,7 @@ data_vw[:,:,1] = np.arctan2( np.diff( data_xy[:,:,1], axis=1), np.diff( data_xy[
 
 
 
-idx = 32
+idx = 3
 LW= 0.5
 BINS_V = np.linspace(0,10,20)
 BINS_W = np.linspace(-np.pi, np.pi,20)

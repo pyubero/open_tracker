@@ -30,21 +30,21 @@ BKGD_FILENAME     = os.path.join( DIR_NAME, 'video_fondo.png')
 
 # ... Reference calibration ...
 HU_THRESH     = 1e-10
-METRIC_THRESH = 2.2
-AREA_MIN      = 40
-AREA_MAX      = 170
+METRIC_THRESH = 3.0
+AREA_MIN      = 60
+AREA_MAX      = 150
 
 # ... General parameters ...
 SPEED_DAMP    = 0.5 
-MAX_STEP      = 45
-WAIT_TIME     = 1
+MAX_STEP      = 30
+WAIT_TIME     = 10
 VERBOSE  = False
 
 # ... Output ...
 WORMS = []
 COLORS= []
-FRAME_WIDTH = 2592
-FRAME_HEIGHT= 1944
+FRAME_WIDTH = 2592 #2592
+FRAME_HEIGHT= 1944 #1944
 ZOOM        = 1.0
 TRUE_VIDEO  = False
 EXPORT_TRAJ = True
@@ -81,6 +81,7 @@ TRACKER = MultiWormTracker( max_step=MAX_STEP,
                             n_step=20,
                             speed_damp=SPEED_DAMP,
                             is_worm = check_worm,
+                            keep_alive = 2,
                             verbose = VERBOSE)
 
 #... if true_video == True, then load the video
@@ -100,22 +101,26 @@ for t in tqdm(range(n_frames)):
     while len(WORMS) > len(COLORS):
         COLORS.append( np.random.randint(255, size=(3,)) )        
     
-    
-    
+
     # Reconstruct image from contours
     if TRUE_VIDEO:
         ret, frame = cap.read()
     else:
         frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH,3), dtype='uint8')
         cv2.drawContours(frame, contours, -1, (255,255,255), -1, cv2.LINE_AA)
+        frame = 255-frame
     
     #... draw circle around current worms 
-    _ = [cv2.circle(frame, ( int(w.x[-1]), int(w.y[-1])), MAX_STEP, COLORS[jj].tolist(), 2) for jj, w in enumerate(WORMS)]
-    _ = [cv2.putText(frame, "%d" % jj, ( int(w.x[-1]+10), int(w.y[-1]-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[jj].tolist(), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS)]
+    _ = [cv2.circle(frame, ( int(w.x[-1]), int(w.y[-1])), MAX_STEP, COLORS[jj].tolist(), 2) for jj, w in enumerate(WORMS) if w.x[-1]>0 ]
+    # _ = [cv2.putText(frame, "%d" % jj, ( int(w.x[-1]+10), int(w.y[-1]-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[jj].tolist(), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS) if w.x[-1]>0 ]
+    
+    #... draw estelas of worms   
+    # for worm_jj, worm in enumerate(WORMS):
+    #     [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x, worm.y) if x>0 ]
     
     #... zoom in and resize output
     frame = vutils.zoom_in(frame, [0.5,0.5] , ZOOM)
-    frame = cv2.resize(frame, (1280,960))
+    frame = cv2.resize(frame, (800,600))
     
     #... add labels
     cv2.putText(frame,  "frame : %d" % t,
@@ -136,13 +141,37 @@ for t in tqdm(range(n_frames)):
     
 cv2.destroyAllWindows()
 
+
+
+
+
+
+
 print('---------------------------------')
 print('Speed: %1.3f fps'% (t/(datetime.now()-tStart).total_seconds() )  )
 print('Number of worms at the end: %d' % len(WORMS) )
 
 if EXPORT_TRAJ:
+    # Easily export all worm objects
     with open(TRAJ_FILENAME,'wb') as f:
         pickle.dump( WORMS, f)
+
+
+    # Or export their coordinates
+    # n_worms  = len(WORMS)
+
+    # data_xy = np.nan*np.zeros( (n_worms, n_frames, 2) )
+    # for i_worm, worm in enumerate( WORMS):
+    #     length = len( worm.x)
+    #     ini = worm.t0
+    #     fin = ini + length
+    #     data_xy[i_worm, ini:fin, 0] = worm.x
+    #     data_xy[i_worm, ini:fin, 1] = worm.y
+    
+    # np.savez( TRAJ_FILENAME.split('.')[0]+'.npz', data=data_xy)
+
+
+
 
 
 

@@ -54,7 +54,7 @@ class Worm:
 
 #.............................................................................#
 class MultiWormTracker:
-    def __init__(self, max_step=100, n_step=10, speed_damp=0.5, is_worm = None, verbose=False):
+    def __init__(self, max_step=100, n_step=10, speed_damp=0.5, is_worm = None, keep_alive=-1, verbose=False):
         self.WORMS = []
         
         self.MAX_STEP = max_step
@@ -63,7 +63,9 @@ class MultiWormTracker:
         self.IS_WORM   = is_worm
         self.VERBOSE   = verbose
         self.N_CALLS   = -1
-    
+        self.KEEP_ALIVE = keep_alive
+        
+        
     def __centroid(self, contour):
         M = cv2.moments(contour)
         cX = int(M["m10"] / M["m00"])
@@ -144,13 +146,66 @@ class MultiWormTracker:
                     print('--- Linked worm %d to blob %d at distance %1.1f' % (worm_jj, idx, dist[idx]) )
     
     
-        ###### 3. Keep worms alive ######
+        ###### 3. Keep worms alive or not ######
+        # For all worms left, keep them alive only if their speed in the last 
+        # self.KEEP_ALIVE number of frames is different than zero.
+        # If they are to be ignored, first finish their position with a nan to
+        # stop them being tracked.
+        
         for worm_jj in np.random.permutation( worms_t_1_disp):
-            expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP )
-            self.WORMS[ worm_jj ].update( expected_position )
-            self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
+            _valid_pos= self.WORMS[ worm_jj ].x[-1] > 0
+            _subspeed = self.WORMS[ worm_jj ].speed_module()[-self.KEEP_ALIVE:]
+            t_without_moving = np.sum( _subspeed == 0 )
+            
+            to_ignore = (self.KEEP_ALIVE>0) and (t_without_moving>=self.KEEP_ALIVE)
+            to_delete = self.WORMS[ worm_jj ].x[-1] > 0
+            
+            # Track only if it has a valid last position, and a valid speed
+            to_track = (self.WORMS[worm_jj].x[-1]>0) and (t_without_moving<self.KEEP_ALIVE)
+            if _valid_pos:
+                if to_ignore:
+                    expected_position = np.zeros((2,))*np.nan
+                    self.WORMS[ worm_jj ].update( expected_position )
+                else:
+                    expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP )
+                    self.WORMS[ worm_jj ].update( expected_position )
+                    self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
+                    
+            # Ignore worm when self.KEEP_ALIVE option is different than 0
+            #             when t_without moving is equal than self.KEEP_ALIVE frames
+            #   if ignored for the first time, you need to "delete" it, by placing nans
+            #   if it already has .x[-1]=nan then just simply ignore it
+            # If it should not be ignored, then update it with the expected position
+            
+            # if to_ignore and to_delete:
+            #     expected_position = np.zeros((2,))*np.nan
+            #     self.WORMS[ worm_jj ].update( expected_position )
+            # elif to_ignore and not to_delete:
+            # #    pass
+            #     print('Success, ignored and not deleted')
+            # else:
+            #     expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP )
+            #     self.WORMS[ worm_jj ].update( expected_position )
+            #     self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
+            
+            
+            # print('Worm %d has been %d frames without moving.' % (worm_jj, t_without_moving) )
+            
+            # if (self.KEEP_ALIVE>0) and (self.N_CALLS>self.KEEP_ALIVE) and (t_without_moving>=self.KEEP_ALIVE):
+            #     if not np.isnan(self.WORMS[ worm_jj ].x[-1]):
+            #         expected_position = np.zeros((2,))*np.nan
+            #         self.WORMS[ worm_jj ].update( expected_position )
+            #         self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
+            #     else:
+            #         print('Worm %d not updated with a nan')
+            # else:
+            #     expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP )
+            
+            #     self.WORMS[ worm_jj ].update( expected_position )
+            #     self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
 
 
+        
         ###### 4. New worm identification ######
         # These are the blobs that are potentially new, solitary, worms
         blobs_left = [jj for jj in range(len(blobs_t)) if jj not in blobs_t_used ]
