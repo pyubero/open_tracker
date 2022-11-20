@@ -22,22 +22,26 @@ import pytracker.video_utils as vutils
 
 # ... Filenames ... 
 # DIR_NAME          = './videos/_cut'
-DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
+# DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
+DIR_NAME          = './videos/Carla_EC/Analysis'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 TRAJ_FILENAME     = os.path.join( DIR_NAME, 'trajectories.pkl')
 IMG_FILENAME      = os.path.join( DIR_NAME, 'trajectories.png')
 BKGD_FILENAME     = os.path.join( DIR_NAME, 'video_fondo.png')
+ROIS_FILENAME     = os.path.join( DIR_NAME, 'rois.pkl')
+
 
 # ... Reference calibration ...
-HU_THRESH     = 1e-10
-METRIC_THRESH = 3.30
-AREA_MIN      = 100
-AREA_MAX      = 250
+HU_THRESH     = 1e-08
+METRIC_THRESH = 3.50
+AREA_MIN      = 130
+AREA_MAX      = 280
 
 # ... General parameters ...
 SPEED_DAMP    = 0.5 
-MAX_STEP      = 30
+INERTIA       = 5
+MAX_STEP      = 25
 WAIT_TIME     = 10
 VERBOSE  = False
 
@@ -50,6 +54,10 @@ ZOOM        = 1.0
 TRUE_VIDEO  = False
 EXPORT_TRAJ = False
 
+# Load ROIS
+with open( ROIS_FILENAME, 'rb') as f:
+    data = pickle.load(f) 
+plate = data[0]
 
 
 # Step 1. Load blob data from BLOB_FILENAME
@@ -79,6 +87,7 @@ def check_worm(contour):
 # Step 3. Create Tracker Object and list of COLORS, one for each worm
 COLORS  = []
 TRACKER = MultiWormTracker( max_step=MAX_STEP,
+                            inertia = INERTIA,
                             n_step=20,
                             speed_damp=SPEED_DAMP,
                             is_worm = check_worm,
@@ -117,8 +126,11 @@ for t in tqdm(range(n_frames)):
     
     #... draw estelas of worms   
     for worm_jj, worm in enumerate(WORMS):
-        [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x, worm.y) if x>0 ]
-    
+        [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x[-200:], worm.y[-200:]) if x>0 ]
+
+    #... draw plate 
+    cv2.circle( frame, (plate[0], plate[1]), plate[2],(0,255,0),5)
+
     #... zoom in and resize output
     frame = vutils.zoom_in(frame, [0.5,0.5] , ZOOM)
     frame = cv2.resize(frame, (800,600))
@@ -126,7 +138,7 @@ for t in tqdm(range(n_frames)):
     #... add labels
     cv2.putText(frame,  "frame : %d" % t,
                 (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 1, cv2.LINE_AA)
-    cv2.putText(frame,  "#worms : %d" % len(WORMS),
+    cv2.putText(frame,  "#worms : %d" % np.sum([ w.x[-1]>0 for w in WORMS]),
                 (10,80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 1, cv2.LINE_AA)
     
     #... display image

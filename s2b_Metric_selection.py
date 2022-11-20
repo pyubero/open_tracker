@@ -16,12 +16,13 @@ import pytracker.video_utils as vutils
 
 # DIR_NAME          = 'SampleVideo'
 # DIR_NAME          = './videos/_cut'
-DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
+# DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
+DIR_NAME          = './videos/Carla_EC/Analysis'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 OUTPUT            = os.path.join( DIR_NAME, './video_likely_worms')
 NMAX              = 100
-HU_THRESH         = 1e-10
+HU_THRESH         = 1e-8
 
 
 print('')

@@ -48,7 +48,8 @@ cam.summary()
 
 #...
 
-cam.recording_filename = './videos/N2_chem_cond_2h_conNaCl_sin_food_grad100mM_4h_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
+# cam.recording_filename = './videos/N2_chem_cond_2h_conNaCl_sin_food_grad100mM_4h_DATETIME_NVIDEO.avi' #... NVIDEO will be substituted by video index
+cam.recording_filename = './videos/test.avi' #... NVIDEO will be substituted by video index
 cam.recording_format   = 'MP42'
 cam.recording_fps      = 2
 cam.recording_totaltime= 3*3600  #... in seconds
@@ -64,7 +65,6 @@ print('Resolution: %dx%d' % ( cam.get('width'), cam.get('height')) )
 #... and start recording by pressing R
 if cam.start_streaming():
     cam.start_preview( formfactor=1.0)
-
 
 
 # Close camera

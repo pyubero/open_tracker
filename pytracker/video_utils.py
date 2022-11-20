@@ -41,8 +41,9 @@ class Worm:
         self.x = np.append( self.x, new_position[0] )
         self.y = np.append( self.y, new_position[1] )
         
-    def expected_position(self, alpha=1):
-        return self.coordinates()[-1] + alpha*self.speed()[-1]
+    def expected_position(self, alpha=1, inertia=1):
+        # return self.coordinates()[-1] + alpha*self.speed()[-1]
+        return  self.coordinates()[-1] + alpha*np.nanmean(self.speed()[-inertia:], axis=0)
         
     def update_contour(self, contour, autocenter=True):
         if autocenter:
@@ -54,10 +55,11 @@ class Worm:
 
 #.............................................................................#
 class MultiWormTracker:
-    def __init__(self, max_step=100, n_step=10, speed_damp=0.5, is_worm = None, keep_alive=-1, verbose=False):
+    def __init__(self, max_step=100, inertia = 5, n_step=10, speed_damp=0.5, is_worm = None, keep_alive=-1, verbose=False):
         self.WORMS = []
-        
+
         self.MAX_STEP = max_step
+        self.INERTIA  = inertia
         self.N_STEP   = n_step
         self.SPEED_DAMP= speed_damp
         self.IS_WORM   = is_worm
@@ -99,7 +101,7 @@ class MultiWormTracker:
             for worm_jj in np.random.permutation( worms_t_1_disp.copy() ):
                 
                 #... I compute its distance to all blobs
-                _worm_expected = self.WORMS[worm_jj].expected_position( alpha = self.SPEED_DAMP)
+                _worm_expected = self.WORMS[worm_jj].expected_position( alpha = self.SPEED_DAMP, inertia=self.INERTIA)
                 dist = np.sqrt( np.sum( ( _worm_expected - blobs_t_disp )**2, axis=1) )
                 
                 #... if any blob is closer than _radius
@@ -131,7 +133,7 @@ class MultiWormTracker:
         ###### 2. Naive tracking ######
         # BUT, untracked worms that are suspiciously close to unused blobs (perhaps large ones) should be linked together            
         for worm_jj in np.random.permutation( worms_t_1_disp):
-            _worm_expected = self.WORMS[worm_jj].expected_position( alpha = self.SPEED_DAMP)
+            _worm_expected = self.WORMS[worm_jj].expected_position( alpha = self.SPEED_DAMP, inertia=self.INERTIA)
             dist = np.sqrt( np.sum( ( _worm_expected - blobs_t )**2, axis=1) )
             
             if np.any( dist < self.MAX_STEP ):
@@ -167,7 +169,7 @@ class MultiWormTracker:
                     expected_position = np.zeros((2,))*np.nan
                     self.WORMS[ worm_jj ].update( expected_position )
                 else:
-                    expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP )
+                    expected_position = self.WORMS[ worm_jj].expected_position(alpha = self.SPEED_DAMP , inertia=self.INERTIA)
                     self.WORMS[ worm_jj ].update( expected_position )
                     self.WORMS[ worm_jj ].update_contour( self.WORMS[worm_jj].c[-1] )
                     

@@ -287,7 +287,7 @@ class myCamera:
 
     #################################
     ########## PREVIEW EASY #########
-    def start_preview(self, formfactor=1):
+    def start_preview(self, formfactor=1, vlim=[10,230]):
         #... start stream if there is none
         if self.start_streaming():
             print('Starting camera preview.')
@@ -312,20 +312,32 @@ class myCamera:
                 frame    = self._resize( self.frame, self.preview_ffactor_main)
                 frame    = cv2.cvtColor( frame, cv2.COLOR_GRAY2BGR )
                 fgMask = backSub.apply(frame)
-
+                
+                # Prepare output
+                output = frame.copy()
+                gray   = cv2.cvtColor( frame, cv2.COLOR_BGR2GRAY) 
+                
+                # Detect (un)burnt pixels
+                _, thresh_high = cv2.threshold( gray, int(vlim[1]), 255,cv2.THRESH_BINARY)
+                cnt_high, _ = cv2.findContours(thresh_high, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                _, thresh_low = cv2.threshold( gray, vlim[0],255,cv2.THRESH_BINARY_INV)
+                cnt_low, _ = cv2.findContours(thresh_low, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(output, cnt_high, -1, (255,0,0), -1)                  
+                cv2.drawContours(output, cnt_low , -1, (0,0,255), -1)   
+                
                 # Draw fps and temp info and x-bar on the main frame
                 fps_text = '%1.1f +/- %1.1f' % self.streaming_fps() 
                 temp_text= 'Temp = %2.1f' % self.properties['temperature']
                 color    = (0,0,255)
                 font     = cv2.FONT_HERSHEY_SIMPLEX
-                frame    = cv2.putText(frame, fps_text,  (20,20), font, 0.5, color, 1, cv2.LINE_AA )
-                frame    = cv2.putText(frame, temp_text, (20,40), font, 0.5, color, 1, cv2.LINE_AA )
-                frame    = self.__draw_crossbar(frame, cb_size=0.05)
+                output    = cv2.putText(output, fps_text,  (20,20), font, 0.5, color, 1, cv2.LINE_AA )
+                output    = cv2.putText(output, temp_text, (20,40), font, 0.5, color, 1, cv2.LINE_AA )
+                output    = self.__draw_crossbar(output, cb_size=0.05)
                                             
                 # Draw some text with information on the main frame
                 if self.thread_recording_running:
                     rec_text = '[REC %ds]' % self.recording_time
-                    cv2.putText(frame, rec_text, (20,60), font, 0.5, color, 1, cv2.LINE_AA )
+                    cv2.putText(output, rec_text, (20,60), font, 0.5, color, 1, cv2.LINE_AA )
                    
                     
                     
@@ -342,16 +354,16 @@ class myCamera:
                     cv2.setMouseCallback(self.preview_winname_zoom, lambda event,x,y,flags,params : self.__preview_callback(event,x,y,flags,'zoom') )
                     
                     #... draw on the main frame the zoomed rectangle
-                    frame = cv2.rectangle( frame, ( int(x0*ff) ,int(y0*ff) ), ( int(x0*ff+w*ff), int(y0*ff+h*ff) ), (255,0,0), 1 )
+                    output = cv2.rectangle( output, ( int(x0*ff) ,int(y0*ff) ), ( int(x0*ff+w*ff), int(y0*ff+h*ff) ), (255,0,0), 1 )
                     
                 # Track and highlight moving objects with a MOG background detector
                 if self.preview_autotrack:
                     ret, thresh = cv2.threshold( fgMask,127,255,cv2.THRESH_BINARY)
                     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                    cv2.drawContours(frame, contours, -1, (0,255,0), 2)                  
+                    cv2.drawContours(output, contours, -1, (0,255,0), 2)                  
                 
                     
-                cv2.imshow(self.preview_winname_main, frame  )
+                cv2.imshow(self.preview_winname_main, output  )
                 cv2.setMouseCallback(self.preview_winname_main, lambda event,x,y,flags,params : self.__preview_callback(event,x,y,flags,'main') )
                 
            
