@@ -21,11 +21,11 @@ import pytracker.video_utils as vutils
 
 
 # ... Filenames ... 
-DIR_NAME          = 'videos/_cut'
+DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 TRAJ_FILENAME     = os.path.join( DIR_NAME, 'trajectories.pkl')
-NPZ_FILENAME      = os.path.join( DIR_NAME, 'trajectories.npz')
+NPZ_FILENAME      = os.path.join( DIR_NAME, 'trajectories.pkl.npz')
 IMG_FILENAME      = os.path.join( DIR_NAME, 'trajectories.png')
 BKGD_FILENAME     = os.path.join( DIR_NAME, 'video_fondo.png')
 ROIS_FILENAME     = os.path.join( DIR_NAME, 'rois.pkl')

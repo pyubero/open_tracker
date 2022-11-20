@@ -28,28 +28,29 @@ from matplotlib import pyplot as plt
 
 
 # ... Filenames ... 
-DIR_PATH  = './videos/_cut'
+DIR_PATH  = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
 VIDEO_FILENAME  = DIR_PATH+'.avi'
 OUTPUT_FILENAME = os.path.join( DIR_PATH, 'video_data_blobs.pkl') 
 BKGD_FILENAME   = os.path.join( DIR_PATH, 'video_fondo.png')
 ROIS_FILENAME   = os.path.join( DIR_PATH, 'rois.pkl')
 
 # ... General parameters ...
-SKIP_FRAMES = 300        #... skip a number of initial frames from the video
-BG_FRAMES   = 200      #... number of frames to model the background
-BG_SKIP     =  10      #... number of discarded frames during background creation
+SKIP_FRAMES = 0        #... skip a number of initial frames from the video
+BG_FRAMES   = 100      #... number of frames to model the background
+BG_SKIP     =  20      #... number of discarded frames during background creation
 MIN_AREA    = 50       #... minimum contour area, helps ignore salt and pepper noise
 MAX_AREA    = 40000    #... maximum contour area
 BLUR_SIZE   = 3        #... Kernel size for blurring and opening/closing operations
 FORMFACTOR  = 1        #... form factor of output, typically 1
 MAX_FRAMES  = 999999   #... maximum number of frames to process (in case the video is super long)
 WAIT_TIME   = 1        #... wait time of each frame during the preview
-PLATE_SIZE  = 0.9      #... expected plate size relative to frame size
+PLATE_SIZE  = 0.65      #... expected plate size relative to frame size
+R0_PLATE    = [0.5,0.5]
 CHUNK_SIZE  = 0.08
-ZOOM        = 3.0        #... zoom factor during the preview
+ZOOM        = 1.2        #... zoom factor during the preview
 USE_MOG       = False  #... activate automatic background subtraction using MOG       
 GENERATE_BKGD = False  #... or generate "manual" and static background model
-EXPORT_DATA   = False
+EXPORT_DATA   = True
 
 # ... Output ...
 CONTOURS  = [] 
@@ -74,10 +75,11 @@ _h , _w , _ = frame.shape
 
 # Step 2. Generate or load the background
 if GENERATE_BKGD:
+    print('Generating background...')
     fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP, mad=3 )
     # fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP )
     cv2.imwrite( BKGD_FILENAME, fondo )
-    print('Background created.')
+    print('Background saved.')
     
 if USE_MOG:
     backSub = cv2.createBackgroundSubtractorMOG2()
@@ -88,11 +90,16 @@ fondo = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
 
 
 # Step 3. Detect plate...
-plate = vutils.detect_plate( fondo , size_ratio=PLATE_SIZE, blur_kernel=20, r0=[0.5,0.5])
+plate = vutils.detect_plate( fondo , size_ratio=PLATE_SIZE, blur_kernel=3, r0=R0_PLATE)
+plate[2] = plate[2]*1.02
 print('Scale is: %1.2f px/mm' % (plate[2]/55) )
 
-chunk = vutils.detect_plate( fondo , size_ratio=CHUNK_SIZE, blur_kernel=3, r0=[0.3, 0.5])
-print('Scale is: %1.2f px/mm' % (chunk[2]/5) )
+
+# chunk = plate.copy()
+# chunk[2] = chunk[2]*0.12
+chunk = np.zeros(3,).astype('int')
+# chunk = vutils.detect_plate( fondo , size_ratio=CHUNK_SIZE, blur_kernel=3, r0=[0.3, 0.5])
+# print('Scale is: %1.2f px/mm' % (chunk[2]/5) )
 
 
 # ... and create a mask.
@@ -152,7 +159,7 @@ for _ in tqdm(range(int(n_frames))):
     
     # >>> PREPROCESSING I <<<
     gray = cv2.bitwise_and(gray, mask_plate)
-    gray = vutils.adjust_gamma( gray, gamma=0.7 )
+    gray = vutils.adjust_gamma( gray, gamma=0.8 )
     gray = cv2.medianBlur(gray, BLUR_SIZE)
     gray = vutils.adjust_gamma( gray, gamma=3.0)
     gray = vutils.auto_BC(gray)
@@ -160,8 +167,8 @@ for _ in tqdm(range(int(n_frames))):
     # >>> PREPROCESSING II <<<
     _, thresh = cv2.threshold( gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU )
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, np.ones((BLUR_SIZE,BLUR_SIZE), np.uint8) )
-    # thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, np.ones((3,3), np.uint8) )
-    # thresh = cv2.medianBlur(thresh, BLUR_SIZE)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, np.ones((3,3), np.uint8) )
+    thresh = cv2.medianBlur(thresh, BLUR_SIZE)
 
     #... find and export contours
     cnt, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -175,8 +182,8 @@ for _ in tqdm(range(int(n_frames))):
     
     # >>> PREVIEW <<<
     # output = frame.copy()
-    output = 255-gray.copy()
-    # output = thresh.copy()
+    # output = 255-gray.copy()
+    output = thresh.copy()
     
     #... convert to color if output is in grayscale
     if len( output.shape ) ==2:
@@ -223,6 +230,6 @@ plt.figure( figsize=(6,4), dpi=300)
 plt.plot( nworms)
 plt.xlabel('Number of frames')
 plt.ylabel('Number of worms')   
-
+plt.yscale('log')
 print( np.mean( nworms[-20:]), np.std(nworms[-20:]))
  

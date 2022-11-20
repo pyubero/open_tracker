@@ -21,7 +21,8 @@ import pytracker.video_utils as vutils
 
 
 # ... Filenames ... 
-DIR_NAME          = './videos/_cut'
+# DIR_NAME          = './videos/_cut'
+DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 TRAJ_FILENAME     = os.path.join( DIR_NAME, 'trajectories.pkl')
@@ -30,9 +31,9 @@ BKGD_FILENAME     = os.path.join( DIR_NAME, 'video_fondo.png')
 
 # ... Reference calibration ...
 HU_THRESH     = 1e-10
-METRIC_THRESH = 3.0
-AREA_MIN      = 60
-AREA_MAX      = 150
+METRIC_THRESH = 3.30
+AREA_MIN      = 100
+AREA_MAX      = 250
 
 # ... General parameters ...
 SPEED_DAMP    = 0.5 
@@ -47,7 +48,7 @@ FRAME_WIDTH = 2592 #2592
 FRAME_HEIGHT= 1944 #1944
 ZOOM        = 1.0
 TRUE_VIDEO  = False
-EXPORT_TRAJ = True
+EXPORT_TRAJ = False
 
 
 
@@ -115,8 +116,8 @@ for t in tqdm(range(n_frames)):
     # _ = [cv2.putText(frame, "%d" % jj, ( int(w.x[-1]+10), int(w.y[-1]-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[jj].tolist(), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS) if w.x[-1]>0 ]
     
     #... draw estelas of worms   
-    # for worm_jj, worm in enumerate(WORMS):
-    #     [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x, worm.y) if x>0 ]
+    for worm_jj, worm in enumerate(WORMS):
+        [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x, worm.y) if x>0 ]
     
     #... zoom in and resize output
     frame = vutils.zoom_in(frame, [0.5,0.5] , ZOOM)
@@ -158,17 +159,17 @@ if EXPORT_TRAJ:
 
 
     # Or export their coordinates
-    # n_worms  = len(WORMS)
+    n_worms  = len(WORMS)
 
-    # data_xy = np.nan*np.zeros( (n_worms, n_frames, 2) )
-    # for i_worm, worm in enumerate( WORMS):
-    #     length = len( worm.x)
-    #     ini = worm.t0
-    #     fin = ini + length
-    #     data_xy[i_worm, ini:fin, 0] = worm.x
-    #     data_xy[i_worm, ini:fin, 1] = worm.y
+    data_xy = np.nan*np.zeros( (n_worms, n_frames, 2) )
+    for i_worm, worm in enumerate( WORMS):
+        length = len( worm.x)
+        ini = worm.t0
+        fin = ini + length
+        data_xy[i_worm, ini:fin, 0] = worm.x
+        data_xy[i_worm, ini:fin, 1] = worm.y
     
-    # np.savez( TRAJ_FILENAME.split('.')[0]+'.npz', data=data_xy)
+    np.savez( TRAJ_FILENAME+'.npz', data=data_xy)
 
 
 
