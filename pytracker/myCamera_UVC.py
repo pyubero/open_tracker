@@ -152,7 +152,11 @@ class myCamera:
                 print('Could not set the specified %s. Using %d instead.' % (propertyName, self.properties[propertyName]) )
                 return False
         
-        
+    def summary(self):
+        print('----- Summary -----')
+        for key, value in self.properties.items():
+            print("%12s - %1.1f" % (key, value) )
+            
         
         
 
@@ -212,6 +216,7 @@ class myCamera:
             print('Starting camera preview.')
             print('Press R to start recording with default filename.')
             print('Press Z to zoom in a rectangle.')
+            print('Press T to track moving objects.')
             print('Press Q to exit.')
 
             self.preview_running = True
@@ -220,9 +225,14 @@ class myCamera:
             self.preview_ffactor_zoom = 1
             self.preview_winname_main = 'Preview. Press Q to exit.'
             self.preview_winname_zoom = 'Zoom region. Press Z to delete.'
-            
+            self.preview_autotrack = False
+            backSub = cv2.createBackgroundSubtractorMOG2(  detectShadows= False )
+
             while self.preview_running:
                 frame    = self._resize( self.frame, self.preview_ffactor_main)
+                fgMask = backSub.apply(frame)
+                
+                # Draw some text with fps information on the main frame
                 fps_text = '%1.1f +/- %1.1f' % self.streaming_fps() 
                 color    = (0,0,255)
                 coords   = (20,20)
@@ -248,8 +258,14 @@ class myCamera:
                     
                     #... draw on the main frame the zoomed rectangle
                     frame = cv2.rectangle( frame, ( int(x0*ff) ,int(y0*ff) ), ( int(x0*ff+w*ff), int(y0*ff+h*ff) ), (255,0,0), 1 )
-                    
                 
+                # Track and highlight moving objects with a MOG background detector
+                if self.preview_autotrack:
+                    ret, thresh = cv2.threshold( fgMask,127,255,cv2.THRESH_BINARY)
+                    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    cv2.drawContours(frame, contours, -1, (0,255,0), 2)                  
+                
+                         
                 cv2.imshow(self.preview_winname_main, frame  )
                 cv2.setMouseCallback(self.preview_winname_main, lambda event,x,y,flags,params : self.__preview_callback(event,x,y,flags,'main') )
                 
@@ -260,6 +276,8 @@ class myCamera:
                     break
                 elif key == ord('r'):
                     self.toggle_recording()
+                elif key == ord('t'):
+                    self.preview_autotrack = not self.preview_autotrack
                 elif key == ord('z'):
                     if self.preview_zoom_bbox:
                         self.preview_zoom_bbox=None

@@ -6,15 +6,9 @@ Created on Mon Mar 28 17:08:07 2022
 """
 
 
-
-
 # from vimba import *
-from pytracker import myCamera_Alvium as myCamera
-
-# from time import sleep
-# from multiprocessing import Process
-# from pytracker import myArduTracker
-# from pytracker import myArduinoGui as GUI
+# from pytracker import myCamera_Alvium as myCamera
+from pytracker import myCamera_UVC as myCamera
 
 
 # # Find devices connected to computer
@@ -44,9 +38,9 @@ from pytracker import myCamera_Alvium as myCamera
 cam = myCamera.myCamera(0)
 
 # Set some properties
-cam.set('width', 2592)
-cam.set('height', 1944)
-cam.set('exposure', 36964) # good values are 1775, 3563, 4832, 5597, 7395
+# cam.set('width', 2592)
+# cam.set('height', 1944)
+# cam.set('exposure', 36964) # good values are 1775, 3563, 4832, 5597, 7395
 
 
 frame = cam.snapshot()
@@ -69,7 +63,7 @@ print('Resolution: %dx%d' % ( cam.get('width'), cam.get('height')) )
 # Start stream, and preview
 #... and start recording by pressing R
 if cam.start_streaming():
-    cam.start_preview( formfactor=0.33)
+    cam.start_preview( formfactor=1.0)
 
 
 
