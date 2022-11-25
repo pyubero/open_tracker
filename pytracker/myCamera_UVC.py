@@ -352,7 +352,7 @@ class myCamera:
         self.recording_nframes = 0
         self.recording_start   = datetime.now()
 
-        filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
+        filename = filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo ).replace('DATETIME', datetime.now().strftime('%y%m%d%H%M') )
         THREADFUN = lambda: self.__recording_fun(filename, fmt, total_time, fps)
         
         self.thread_recording = Thread(target = THREADFUN, daemon = True) 
@@ -406,7 +406,7 @@ class myCamera:
 
 
     def __restart_recording(self):
-        filename = self.recording_filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
+        filename = self.recording_filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo ).replace('DATETIME', datetime.now().strftime('%y%m%d%H%M') )
         fmt        = self.recording_format
         total_time = self.recording_totaltime
         fps        = self.recording_fps

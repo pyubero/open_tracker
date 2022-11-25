@@ -318,12 +318,12 @@ class myCamera:
                 gray   = cv2.cvtColor( frame, cv2.COLOR_BGR2GRAY) 
                 
                 # Detect (un)burnt pixels
-                _, thresh_high = cv2.threshold( gray, int(vlim[1]), 255,cv2.THRESH_BINARY)
-                cnt_high, _ = cv2.findContours(thresh_high, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                _, thresh_low = cv2.threshold( gray, vlim[0],255,cv2.THRESH_BINARY_INV)
-                cnt_low, _ = cv2.findContours(thresh_low, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                cv2.drawContours(output, cnt_high, -1, (255,0,0), -1)                  
-                cv2.drawContours(output, cnt_low , -1, (0,0,255), -1)   
+                # _, thresh_high = cv2.threshold( gray, int(vlim[1]), 255,cv2.THRESH_BINARY)
+                # cnt_high, _ = cv2.findContours(thresh_high, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                # _, thresh_low = cv2.threshold( gray, int(vlim[0]),255,cv2.THRESH_BINARY_INV)
+                # cnt_low, _ = cv2.findContours(thresh_low, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                # cv2.drawContours(output, cnt_high, -1, (255,0,0), 1)                  
+                # cv2.drawContours(output, cnt_low , -1, (0,0,255), 1)   
                 
                 # Draw fps and temp info and x-bar on the main frame
                 fps_text = '%1.1f +/- %1.1f' % self.streaming_fps() 
@@ -522,7 +522,7 @@ class myCamera:
     
     
     def __restart_recording(self):
-        filename = self.recording_filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo )
+        filename = self.recording_filename.replace( 'NVIDEO', '%03d' % self.recording_nvideo ).replace('DATETIME', datetime.now().strftime('%y%m%d%H%M') )
         fmt        = self.recording_format
         total_time = self.recording_totaltime
         fps        = self.recording_fps

@@ -24,16 +24,18 @@ if __name__ == '__main__':
     board = myArduTracker.myArduTracker( devices[-1] )
     print(' done.')
     
+    
+    
     # Connect potentiometer, 
-    print('Linking potentiometer...', end='')
-    board.start_pot_link('led2')
-    board.led2(0)
+    # print('Linking potentiometer...', end='')
+    # board.start_pot_link('led2')
+    board.led1(5)
     board.led3(5)
     board.write(13,1)
     
     print(' done.')
     
-    # board.close( digital=[] )
+    board.close( digital=[] )
 
 
 
