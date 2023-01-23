@@ -41,7 +41,7 @@ AREA_MAX      = 280
 # ... General parameters ...
 SPEED_DAMP    = 0.5 
 INERTIA       = 5
-MAX_STEP      = 25
+MAX_STEP      = 35
 WAIT_TIME     = 10
 VERBOSE  = False
 
@@ -52,7 +52,7 @@ FRAME_WIDTH = 2592 #2592
 FRAME_HEIGHT= 1944 #1944
 ZOOM        = 1.0
 TRUE_VIDEO  = False
-EXPORT_TRAJ = False
+EXPORT_TRAJ = True
 
 # Load ROIS
 with open( ROIS_FILENAME, 'rb') as f:
@@ -95,7 +95,7 @@ TRACKER = MultiWormTracker( max_step=MAX_STEP,
                             verbose = VERBOSE)
 
 #... if true_video == True, then load the video
-cap = cv2.VideoCapture( DIR_NAME+'.avi')
+# cap = cv2.VideoCapture( DIR_NAME+'.avi')
 
 
 tStart = datetime.now()
@@ -172,18 +172,18 @@ if EXPORT_TRAJ:
 
     # Or export their coordinates
     n_worms  = len(WORMS)
-
-    data_xy = np.nan*np.zeros( (n_worms, n_frames, 2) )
+    T0 = WORMS[0].t0
+    
+    data_xy = np.nan*np.zeros( (n_worms, n_frames+1, 2) )
     for i_worm, worm in enumerate( WORMS):
         length = len( worm.x)
-        ini = worm.t0
+        ini = worm.t0 - T0
         fin = ini + length
+        print(ini, fin)
         data_xy[i_worm, ini:fin, 0] = worm.x
         data_xy[i_worm, ini:fin, 1] = worm.y
     
     np.savez( TRAJ_FILENAME+'.npz', data=data_xy)
-
-
 
 
 
