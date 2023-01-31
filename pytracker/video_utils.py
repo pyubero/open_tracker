@@ -241,19 +241,14 @@ def resize_video(filename, formfactor):
     #... and resize it to find its final size
     ff_frame = cv2.resize( frame, None , fx=formfactor, fy=formfactor )
     
-    
     height , width , c = ff_frame.shape
-    
-    
     
     # Create Video Writer
     out_filename = '.'.join( [ filename.split('.')[-2]+'_ff%1.2f' % formfactor, filename.split('.')[-1]] )
     out = cv2.VideoWriter(out_filename,cv2.VideoWriter_fourcc('M','J','P','G'), 30, (width,height))
     
-    
     #... write first frame
     out.write(ff_frame)
-    
     
     # Then loop...
     for _ in tqdm(range( int( nframes-1) )):
@@ -280,12 +275,10 @@ def cut_video(filename, start_frame=0, end_frame = -1 ):
         print('< E > Start frame needs to be leq total frames.')
         return None
     
-    
     #... get first frame
     suc, frame = cv.read()
     
     height , width , c = frame.shape
-    
     
     
     # Create Video Writer
@@ -324,10 +317,6 @@ def traj2matrix(trajectories):
         output[0, worm_jj, -l:] = worm.x
         output[1, worm_jj, -l:] = worm.y
     return output
-
-
-
-
 
 
 def generate_background( videoCapture, n_imgs = 0, skip=0, processing = None, mad=0 ):
@@ -376,17 +365,17 @@ def generate_background( videoCapture, n_imgs = 0, skip=0, processing = None, ma
     return fondo
 
 
-
-
 def load_background( filename  ):
     fondo = cv2.imread(filename)
     fondo_gray = cv2.cvtColor(fondo, cv2.COLOR_BGR2GRAY )
     return fondo_gray
+
     
 def auto_BC(frame):
     alpha = 255 / (frame.max()- frame.min())
     beta = - frame.min()*alpha
     return cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
+
 
 def adjust_gamma(image, gamma=1.2):
     # build a lookup table mapping the pixel values [0, 255] to
@@ -397,6 +386,7 @@ def adjust_gamma(image, gamma=1.2):
 
     # apply gamma correction using the lookup table
     return cv2.LUT(image, table) 
+
 
 def detect_plate(frame, size_ratio=1.0, r0=[0.5,0.5], mindist=100, blur_kernel=10):
     height, width = frame.shape
@@ -421,21 +411,7 @@ def detect_plate(frame, size_ratio=1.0, r0=[0.5,0.5], mindist=100, blur_kernel=1
         return circles[0,idx,:].astype('int')
     else:
         return np.array([0,0,999]).astype('int')
-    # true_circles=[]
-    # if circles is None:
-    #     return [[0,0,99999]]
-    # for c in circles[0,:]:            
-    #     if (0.8*width/2)<c[0]<(1.2*width/2):
-    #         if (0.8*height/2)<c[1]<(1.2*height/2):
-    #             true_circles.append(c)
-    # true_circles= np.array(true_circles)
-    # print('Found %d good candidates' % len(true_circles))
 
-    # if len(true_circles)>0:
-    #     idx = np.argmin( true_circles[:,2]-exp_radius*size_ratio)
-    #     return true_circles[idx].astype('int')
-    # else:
-    #     return [0,0,99999]
     
 def zoom_in(frame, center, formfactor):
     if formfactor==1.0:
@@ -468,8 +444,10 @@ def zoom_in(frame, center, formfactor):
     output = cv2.resize( frame[yini:yfin, xini:xfin][:] , (width, height) )
     return output
 
+
 def contours_to_list(contours):
     return [  [ [ int(pts[0][0]), int(pts[0][1])] for pts in c ] for c in contours ]
+
 
 def list_to_contours(contours_list):
     return [  np.array(c) for c in contours_list ]
@@ -478,11 +456,6 @@ def list_to_contours(contours_list):
 def export(filename, contour):
     with open(filename, 'wb+') as f:
         pickle.dump(contour, f)
-
-
-
-
-
 
 
 def logHu(contour, thold=0):
@@ -504,10 +477,6 @@ def is_worm(contour, hu_ref, ref_metric, area_min, area_max, hu_thold=0):
         return True
     else:
         return False
-
-
-
-
 
 
 def load_contour_from_image(filename, idx=0):
@@ -532,4 +501,5 @@ def centroid(contour):
     cX = int(M["m10"] / M["m00"])
     cY= int(M["m01"] / M["m00"])
     return [cX,cY]
+    
     

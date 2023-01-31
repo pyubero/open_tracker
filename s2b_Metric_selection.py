@@ -13,19 +13,17 @@ from tqdm import tqdm
 from sklearn.mixture import GaussianMixture
 import pytracker.video_utils as vutils
 
-
-# DIR_NAME          = 'SampleVideo'
-# DIR_NAME          = './videos/_cut'
-# DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
+# ... Filenames ... 
 DIR_NAME          = './videos/Carla_EC/Analysis'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 OUTPUT            = os.path.join( DIR_NAME, './video_likely_worms')
+
+# ... General parameters ...
 NMAX              = 100
 HU_THRESH         = 1e-8
 
 
-print('')
 print('Loading data from %s...' % BLOB_FILENAME)
 with open( BLOB_FILENAME, 'rb') as f:
     CONTOURS = pickle.load( f) 
@@ -36,11 +34,9 @@ with open( BLOB_REF_FILENAME, 'rb') as f:
     CNT_REF = pickle.load(f)
 
 
-
 # Compute the metric for all contours
 hu_ref = vutils.logHu( CNT_REF, HU_THRESH ) 
-metric_all = []
-area_all   = []
+metric_all, area_all = [], []
 
 for contours in tqdm(CONTOURS):
     for c in contours:
@@ -49,6 +45,7 @@ for contours in tqdm(CONTOURS):
         
 metric_all = np.array(metric_all)
 area_all = np.array(area_all)
+
 
 # Fit histogram to a gaussian mixture, to 
 # ... extract the first component
@@ -65,13 +62,14 @@ gmm2 = GaussianMixture(4,
                      covariance_type='full', 
                      random_state=0).fit(  np.expand_dims(area_all[idc], -1) )
 
+
 # Find gaussian that is closest to reference contour area
 idx = np.argmin( np.abs(gmm2.means_ - cv2.contourArea(CNT_REF)))
 ref_area_min = gmm2.means_[idx,0] - np.sqrt(gmm2.covariances_[idx,0])
 ref_area_max = gmm2.means_[idx,0] + np.sqrt(gmm2.covariances_[idx,0])
 
 
-
+# >>> FIGURE 1 <<<
 # Print the histogram of metrics
 plt.figure( figsize=(12,4), dpi=600)
 plt.subplot(1,2,1)
@@ -96,8 +94,8 @@ plt.xlabel('Area')
 
 
 
-
-
+# >>> FIGURE 2 <<<
+# Plot many examples of nicely matching contours.
 plt.figure( figsize=(20,20), dpi=300 )
 total_found = 0
 for contours in CONTOURS:

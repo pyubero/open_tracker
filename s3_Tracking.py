@@ -21,9 +21,7 @@ import pytracker.video_utils as vutils
 
 
 # ... Filenames ... 
-# DIR_NAME          = './videos/_cut'
-# DIR_NAME          = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
-DIR_NAME          = './videos/Carla_EC/Analysis'
+DIR_NAME          = './videos/Analysis'
 BLOB_FILENAME     = os.path.join( DIR_NAME, 'video_data_blobs.pkl')
 BLOB_REF_FILENAME = os.path.join( DIR_NAME, 'video_reference_contour.pkl')
 TRAJ_FILENAME     = os.path.join( DIR_NAME, 'trajectories.pkl')
@@ -48,11 +46,13 @@ VERBOSE  = False
 # ... Output ...
 WORMS = []
 COLORS= []
+TRAIL_SIZE = 200
 FRAME_WIDTH = 2592 #2592
 FRAME_HEIGHT= 1944 #1944
 ZOOM        = 1.0
 TRUE_VIDEO  = False
 EXPORT_TRAJ = True
+
 
 # Load ROIS
 with open( ROIS_FILENAME, 'rb') as f:
@@ -67,9 +67,8 @@ with open( BLOB_FILENAME, 'rb') as f:
     n_frames = len(CONTOURS)
 
 
-
-# Step 2. Prepare reference contour..
-#... load blob
+# Step 2. Prepare reference contour...
+# ... load blob
 print('Loading reference blob from %s...' % BLOB_REF_FILENAME)
 with open( BLOB_REF_FILENAME, 'rb') as f:
     CNT_REF = pickle.load(f)
@@ -83,9 +82,7 @@ def check_worm(contour):
     return vutils.is_worm(contour, HU_REF, METRIC_THRESH, AREA_MIN, AREA_MAX, HU_THRESH)
 
 
-  
-# Step 3. Create Tracker Object and list of COLORS, one for each worm
-COLORS  = []
+# Step 3. Create Tracker Object
 TRACKER = MultiWormTracker( max_step=MAX_STEP,
                             inertia = INERTIA,
                             n_step=20,
@@ -94,8 +91,9 @@ TRACKER = MultiWormTracker( max_step=MAX_STEP,
                             keep_alive = 2,
                             verbose = VERBOSE)
 
-#... if true_video == True, then load the video
-# cap = cv2.VideoCapture( DIR_NAME+'.avi')
+#... load video if you want to see results in "real time"
+if TRUE_VIDEO:
+    cap = cv2.VideoCapture( DIR_NAME+'.avi')
 
 
 tStart = datetime.now()
@@ -106,12 +104,10 @@ for t in tqdm(range(n_frames)):
     WORMS = TRACKER.WORMS.copy()
     
     
-        
     # Assign a unique color to each worm
     while len(WORMS) > len(COLORS):
         COLORS.append( np.random.randint(255, size=(3,)) )        
     
-
     # Reconstruct image from contours
     if TRUE_VIDEO:
         ret, frame = cap.read()
@@ -122,11 +118,13 @@ for t in tqdm(range(n_frames)):
     
     #... draw circle around current worms 
     _ = [cv2.circle(frame, ( int(w.x[-1]), int(w.y[-1])), MAX_STEP, COLORS[jj].tolist(), 2) for jj, w in enumerate(WORMS) if w.x[-1]>0 ]
+    
+    #... write the id next to each worm
     # _ = [cv2.putText(frame, "%d" % jj, ( int(w.x[-1]+10), int(w.y[-1]-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[jj].tolist(), 2, cv2.LINE_AA) for jj, w in enumerate(WORMS) if w.x[-1]>0 ]
     
-    #... draw estelas of worms   
+    #... draw trails of worms   
     for worm_jj, worm in enumerate(WORMS):
-        [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x[-200:], worm.y[-200:]) if x>0 ]
+        [cv2.circle(frame, ( int(x), int(y)), 2, COLORS[worm_jj].tolist(), -1) for x,y in zip(worm.x[-TRAIL_SIZE:], worm.y[-TRAIL_SIZE:]) if x>0 ]
 
     #... draw plate 
     cv2.circle( frame, (plate[0], plate[1]), plate[2],(0,255,0),5)
@@ -147,14 +145,9 @@ for t in tqdm(range(n_frames)):
     if key==ord('q'):
         break
     if key==ord('p'):
-        WAIT_TIME = 1 - WAIT_TIME
-    
-    
-   
+        WAIT_TIME = 1 - WAIT_TIME  
     
 cv2.destroyAllWindows()
-
-
 
 
 
@@ -164,8 +157,8 @@ print('---------------------------------')
 print('Speed: %1.3f fps'% (t/(datetime.now()-tStart).total_seconds() )  )
 print('Number of worms at the end: %d' % len(WORMS) )
 
+# Easily export all worm objects
 if EXPORT_TRAJ:
-    # Easily export all worm objects
     with open(TRAJ_FILENAME,'wb') as f:
         pickle.dump( WORMS, f)
 
@@ -187,7 +180,8 @@ if EXPORT_TRAJ:
 
 
 
-
+# >>> FIGURE 1 <<<
+# Show and save some preliminary results
 fondo = vutils.load_background( BKGD_FILENAME )*0.5
 
 color = plt.cm.viridis(np.linspace(0, 1, len(WORMS)))

@@ -12,32 +12,28 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pytracker.video_utils as vutils
 
-msg1 = "Welcome to ref_contour_finder.\n"+\
-       "This script will help you identify a contour\n"+ \
-       "located in a frame to use it as a reference of your object. Try to choose one\n"+\
-       "as ideal as possible, and then press S to export it. The same reference\n"+\
-       "can then be used throughout different videos.\n"\
-       "Press P to skip a frame\n"+\
-       "Press S to export the current contour\n"+\
-       "Press any other key to skip contour\n"+\
-       "Press Q to quit."
-       
 
-    
-# PROJECT_NAME    = './videos/_cut'# 'SampleVideo'       
-# PROJECT_NAME    = './videos/Carla_EC/Carla_N2_EC_2211101415_002'
-PROJECT_NAME    = './videos/Carla_EC/Analysis'
+PROJECT_NAME    = './videos/Analysis'
 BLOB_FILENAME   = os.path.join(PROJECT_NAME, 'video_data_blobs.pkl' ) 
 OUTPUT_FILENAME = os.path.join(PROJECT_NAME, 'video_reference_contour')
-#536 0
 
-print(msg1)
-print('')
+print("""Welcome to ref_contour_finder.
+This script will help you identify a contour located in a frame to use it as a
+reference of your object. Try to choose one as ideal as possible, and then 
+press S to export it. The same reference can then be used throughout different 
+videos.
+       
+Press P to skip a frame
+Press S to export the current contour
+Press any other key to skip contour
+Press Q to quit.
+""")
+       
+       
 print('Loading data from %s...' % BLOB_FILENAME )
 with open( BLOB_FILENAME, 'rb') as f:
     CONTOURS = pickle.load( f) 
     n_frames = len(CONTOURS)
-
 
 
 _frame = 0
@@ -104,6 +100,3 @@ while _running:
             break
         
 cv2.destroyAllWindows()
-
-
-

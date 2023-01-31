@@ -8,12 +8,10 @@ There are two ways to do background subtraction.
     1) The traditional one, that is, obtaining a "ground truth" without any,
 or as little objects as possible, and then literally subtracting the background
 to every frame.
-    2) The modern and fancy one. In which the ground truth created dynamically,
+    2) The modern and fancy one. In which the ground truth is created dynamically,
 thus in the first frames accuracy decreases, but it later improves. The main
 benefit of it is that slow "ambiental" changes, like lighting changes, are 
 "included" frame by frame in the "dynamic" ground truth.
-
-For more info, please visit 
 
 
 """
@@ -77,14 +75,13 @@ _h , _w , _ = frame.shape
 if GENERATE_BKGD:
     print('Generating background...')
     fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP, mad=3 )
-    # fondo = vutils.generate_background(video, n_imgs = BG_FRAMES, skip = BG_SKIP )
     cv2.imwrite( BKGD_FILENAME, fondo )
     print('Background saved.')
     
 if USE_MOG:
     backSub = cv2.createBackgroundSubtractorMOG2()
 
-
+#... load background from file
 fondo = vutils.load_background( BKGD_FILENAME )
 fondo = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
 
@@ -94,36 +91,24 @@ plate = vutils.detect_plate( fondo , size_ratio=PLATE_SIZE, blur_kernel=3, r0=R0
 plate[2] = plate[2]*1.02
 print('Scale is: %1.2f px/mm' % (plate[2]/55) )
 
-
-# chunk = plate.copy()
-# chunk[2] = chunk[2]*0.12
-chunk = np.zeros(3,).astype('int')
-# chunk = vutils.detect_plate( fondo , size_ratio=CHUNK_SIZE, blur_kernel=3, r0=[0.3, 0.5])
-# print('Scale is: %1.2f px/mm' % (chunk[2]/5) )
-
-
 # ... and create a mask.
-chunk[2] = int(1.2*chunk[2] )
 plate[2] = int(0.99*plate[2] )
 mask_plate = np.zeros_like(fondo)
 mask_plate = cv2.circle(mask_plate, (plate[0],plate[1]), plate[2], (255,), -1)
-mask_plate = cv2.circle(mask_plate, (chunk[0],chunk[1]), chunk[2], (0,), -1)
 
 if EXPORT_DATA:
     with open( ROIS_FILENAME, 'wb') as f:
-        pickle.dump( [plate, chunk], f) 
+        pickle.dump( [plate,], f) 
 
 # Uncomment to show masked ROI on the background
 output = cv2.resize( fondo, ( int(_w*FORMFACTOR) , int(_h*FORMFACTOR) ) )
 output = cv2.cvtColor( output, cv2.COLOR_GRAY2BGR) 
 cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),5)
-cv2.circle( output,(chunk[0], chunk[1]), chunk[2],(0,0,255),5)
 cv2.imshow('w', cv2.resize(output, (800,600) ) )
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
 
-    
 # Step 4. Start blob extraction
 video = cv2.VideoCapture( VIDEO_FILENAME )
 n_frames= video.get( cv2.CAP_PROP_FRAME_COUNT )
@@ -179,7 +164,6 @@ for _ in tqdm(range(int(n_frames))):
     CONTOURS.append(  filtered_contours) 
     
     
-    
     # >>> PREVIEW <<<
     # output = frame.copy()
     # output = 255-gray.copy()
@@ -196,12 +180,14 @@ for _ in tqdm(range(int(n_frames))):
     cv2.circle( output,(plate[0], plate[1]), plate[2],(0,255,0),5)
     cv2.circle( output,(chunk[0], chunk[1]), chunk[2],(0,0,255),5)
 
-    
+    #... prepare output frame
     output = vutils.zoom_in( output, [0.5, 0.5], ZOOM)
     output = cv2.resize( output, (800, 600) )
     output = cv2.putText( output, "%d" % curr_frame, (20,40), font, fontsize, color, thickness, cv2.LINE_AA)
 
     cv2.imshow( 'window', output)
+    
+    #... keep loop running until Q or P are pressed
     key = cv2.waitKey(WAIT_TIME)
     if key==ord('q'):
         break
@@ -209,14 +195,13 @@ for _ in tqdm(range(int(n_frames))):
         WAIT_TIME = (1-WAIT_TIME)
 
 
-
-
-
+# The loop finished
 cv2.destroyAllWindows()
 
-
+# Print some speed statistics
 speed = video.get( cv2.CAP_PROP_POS_FRAMES)/(datetime.now()-tStart).total_seconds()
 print('Analysis speed: %1.2f fps' % (speed) )
+
 
 if EXPORT_DATA:
     print('Data exported to %s.' % OUTPUT_FILENAME )
@@ -224,12 +209,13 @@ if EXPORT_DATA:
         pickle.dump(CONTOURS, f)   
 else:
     print('Data not exported.')
-    
-nworms = np.array([len(c) for c in CONTOURS] )
-plt.figure( figsize=(6,4), dpi=300)
-plt.plot( nworms)
-plt.xlabel('Number of frames')
-plt.ylabel('Number of worms')   
-plt.yscale('log')
-print( np.mean( nworms[-20:]), np.std(nworms[-20:]))
- 
+
+# Uncomment to display an initial plot w/ the number of
+# detected worms in each frame.    
+# nworms = np.array([len(c) for c in CONTOURS] )
+# plt.figure( figsize=(6,4), dpi=300)
+# plt.plot( nworms)
+# plt.xlabel('Number of frames')
+# plt.ylabel('Number of worms')   
+# plt.yscale('log')
+# print( np.mean( nworms[-20:]), np.std(nworms[-20:])) 
