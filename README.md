@@ -3,7 +3,7 @@
 The `open_tracker` is a suite of Computer Vision scripts that automatizes the recording and analysis of *C. elegans* behavioral videos, although it can be used with any animal/object in general. It was developed by Pablo Yubero at the Centro Nacional de Biotecnología (CSIC) in Madrid, Spain for the completion of the doctoral thesis entitled "Trade-offs in the architecture and predictability of complex phenotypes" funded by the Ministerio de Ciencia e Innovación and the Europen Social Fund.
 
 <p align="center">
-<img src="https://github.com/pyubero/open_tracker/blob/main/docs/figure_small.png"  width="400" >
+<img src="https://github.com/pyubero/open_tracker/blob/main/docs/figure_small.png"  width="500" >
 </p>
 
 ## Protocol :bug:
