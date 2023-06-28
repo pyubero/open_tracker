@@ -78,11 +78,9 @@ class MultiWormTracker:
 
 
     def __centroid(self, contour):
-        # M = cv2.moments(contour)
-        # cX = int(M["m10"] / M["m00"])
-        # cY= int(M["m01"] / M["m00"])
-        cX = np.mean(contour[:, 0, 0])
-        cY = np.mean(contour[:, 0, 1])
+        M = cv2.moments(contour)
+        cX = M["m10"] / M["m00"]
+        cY = M["m01"] / M["m00"]
         return [cX,cY]
 
     def export(self, filepath):
