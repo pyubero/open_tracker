@@ -13,26 +13,26 @@ from matplotlib import pyplot as plt
 import pytracker.video_utils as vutils
 
 
-PROJECT_NAME    = './videos/Analysis'
-BLOB_FILENAME   = os.path.join(PROJECT_NAME, 'video_data_blobs.pkl' ) 
+PROJECT_NAME    = './videos/N2_espontaneo/Analysis'
+BLOB_FILENAME   = os.path.join(PROJECT_NAME, 'video_data_blobs.pkl' )
 OUTPUT_FILENAME = os.path.join(PROJECT_NAME, 'video_reference_contour')
 
 print("""Welcome to ref_contour_finder.
 This script will help you identify a contour located in a frame to use it as a
-reference of your object. Try to choose one as ideal as possible, and then 
-press S to export it. The same reference can then be used throughout different 
+reference of your object. Try to choose one as ideal as possible, and then
+press S to export it. The same reference can then be used throughout different
 videos.
-       
+
 Press P to skip a frame
 Press S to export the current contour
 Press any other key to skip contour
 Press Q to quit.
 """)
-       
-       
+
+
 print('Loading data from %s...' % BLOB_FILENAME )
 with open( BLOB_FILENAME, 'rb') as f:
-    CONTOURS = pickle.load( f) 
+    CONTOURS = pickle.load( f)
     n_frames = len(CONTOURS)
 
 
@@ -43,7 +43,7 @@ while _running:
     _frame += 1
     if _frame > n_frames:
         break
-    
+
     contours = CONTOURS[_frame]
 
     # Reconstruct frame
@@ -51,41 +51,41 @@ while _running:
     frame = cv2.drawContours(frame, contours ,-1, (255) , -1, cv2.LINE_AA )
     frame = cv2.cvtColor( frame, cv2.COLOR_GRAY2BGR )
 
-    
+
     for kk, cnt in enumerate(contours):
         _corner = np.min(cnt, axis=0)
         cnt = cnt - _corner
         _size = np.max( (50, np.max(cnt)))
-        
+
         # Image "img" contains a zoom of only the specific contour
         img = np.zeros( (_size,_size,3), dtype='uint8')
         img = cv2.drawContours(img, [ cnt ], -1, (255,255,255) , -1, cv2.LINE_AA )
-    
-    
+
+
         # Prepare left side
         out_l = frame.copy()
-        cv2.drawContours(out_l, [cnt+_corner] ,-1, (0,255,0) , -1, cv2.LINE_AA )    
+        cv2.drawContours(out_l, [cnt+_corner] ,-1, (0,255,0) , -1, cv2.LINE_AA )
         out_l = cv2.resize( out_l, (800,600) )
         cv2.putText( out_l, "frame : %d" % _frame, (10,50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv2.LINE_AA)
-        
-        
+
+
         # Prepare right side
         out_r = cv2.resize(img, (600,600))
         cv2.putText( out_r, "cnt : %d" % kk, (10,550), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,0,255), 2, cv2.LINE_AA)
-        
-        
+
+
         # Prepare display frame
         output = cv2.hconcat( [out_l, out_r] )
         cv2.imshow('wdw', output)
         key = cv2.waitKey(0)
-        
+
         if key == ord('p'):
             break
         if key == ord('s'):
             cnt_ref = cnt
             vutils.export(OUTPUT_FILENAME+'.pkl', cnt)
             print('Contour %d - %d exported!' % (_frame, kk) )
-            
+
             plt.figure(figsize=(5,5), dpi=300)
             plt.imshow(out_r)
             plt.xlim(0,599)
@@ -93,10 +93,10 @@ while _running:
             plt.xticks( plt.xticks()[0], labels='')
             plt.yticks( plt.yticks()[0], labels='')
             plt.savefig( OUTPUT_FILENAME+'.png', dpi=300)
-            
-            
+
+
         if key == ord('q'):
             _running = False
             break
-        
+
 cv2.destroyAllWindows()
